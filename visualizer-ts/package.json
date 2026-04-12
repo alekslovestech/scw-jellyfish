@@ -6,8 +6,8 @@
     "build": "tsc && vite build"
   },
   "dependencies": {
-    "tweakpane": "^3.1.0",
-    "three": "^0.164.0"
+    "three": "^0.164.0",
+    "tweakpane": "^4.0.5"
   },
   "devDependencies": {
     "@types/three": "^0.164.0",
