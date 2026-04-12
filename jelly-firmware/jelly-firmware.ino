@@ -6,7 +6,7 @@
 #include <ESPmDNS.h>
 #include <math.h>
 
-#define FW_VERSION  "v1.1.0"
+#include "version.h"
 #define PIN_WS2812B 4
 #define NUM_PIXELS  50
 
