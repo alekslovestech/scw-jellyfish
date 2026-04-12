@@ -71,7 +71,17 @@ def build_panel(fig, draw):
         sliders[path] = sl
         y -= SL_GAP
 
+    _timer = [None]
+
     def on_change(_val):
+        if _timer[0] is not None:
+            _timer[0].stop()
+        _timer[0] = fig.canvas.new_timer(interval=150)
+        _timer[0].single_shot = True
+        _timer[0].add_callback(redraw)
+        _timer[0].start()
+
+    def redraw():
         for path, sl in sliders.items():
             _setter(path, sl.val)
         draw()
