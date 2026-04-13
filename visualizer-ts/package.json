@@ -5,13 +5,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "start": "vite preview"
+    "start": "vite preview",
+    "gen-og-image": "node scripts/gen-og-image.mjs"
   },
   "dependencies": {
     "three": "^0.164.0",
     "tweakpane": "^4.0.5"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/three": "^0.164.0",
     "typescript": "^5.4.0",
     "vite": "^5.2.0"

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 110">
+  <!-- Bell -->
+  <path d="M10,52 Q10,8 50,8 Q90,8 90,52 Q70,44 50,44 Q30,44 10,52 Z" fill="#55aaee"/>
+  <!-- Inner dome sheen -->
+  <path d="M22,48 Q22,18 50,18 Q78,18 78,48 Q64,42 50,42 Q36,42 22,48 Z" fill="#88ccff" opacity="0.4"/>
+  <!-- Wavy fringe at bell base -->
+  <path d="M10,52 Q18,58 26,52 Q34,58 42,52 Q50,58 58,52 Q66,58 74,52 Q82,58 90,52" stroke="#3377cc" stroke-width="2" fill="none"/>
+  <!-- Tentacles -->
+  <path d="M25,54 Q20,68 25,82 Q20,96 25,108" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M38,54 Q34,69 38,83 Q34,97 38,109" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M62,54 Q66,69 62,83 Q66,97 62,109" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M75,54 Q80,68 75,82 Q80,96 75,108" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Central tentacles (thicker) -->
+  <path d="M46,54 Q42,71 46,88 Q42,102 46,110" stroke="#88ccff" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M54,54 Q58,71 54,88 Q58,102 54,110" stroke="#88ccff" stroke-width="4" fill="none" stroke-linecap="round"/>
+</svg>
