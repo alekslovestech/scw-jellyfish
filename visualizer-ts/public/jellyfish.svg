@@ -1,19 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 107">
   <!-- Background (16:9) -->
   <rect width="190" height="107" fill="#081c38"/>
-  <!-- Jellyfish centered: original 100×110 viewBox, shifted to center -->
-  <!-- Bell -->
-  <path d="M55,58 Q55,14 95,14 Q135,14 135,58 Q115,50 95,50 Q75,50 55,58 Z" fill="#55aaee"/>
+  <!-- Bell (shifted up 10 from previous) -->
+  <path d="M55,48 Q55,4 95,4 Q135,4 135,48 Q115,40 95,40 Q75,40 55,48 Z" fill="#55aaee"/>
   <!-- Inner dome sheen -->
-  <path d="M67,54 Q67,24 95,24 Q123,24 123,54 Q109,48 95,48 Q81,48 67,54 Z" fill="#88ccff" opacity="0.4"/>
+  <path d="M67,44 Q67,14 95,14 Q123,14 123,44 Q109,38 95,38 Q81,38 67,44 Z" fill="#88ccff" opacity="0.4"/>
   <!-- Wavy fringe -->
-  <path d="M55,58 Q63,64 71,58 Q79,64 87,58 Q95,64 103,58 Q111,64 119,58 Q127,64 135,58" stroke="#3377cc" stroke-width="2" fill="none"/>
+  <path d="M55,48 Q63,54 71,48 Q79,54 87,48 Q95,54 103,48 Q111,54 119,48 Q127,54 135,48" stroke="#3377cc" stroke-width="2" fill="none"/>
   <!-- Outer tentacles -->
-  <path d="M70,60 Q65,74 70,88 Q65,100 70,107" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M83,60 Q79,75 83,89 Q79,103 83,107" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M107,60 Q111,75 107,89 Q111,103 107,107" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-  <path d="M120,60 Q125,74 120,88 Q125,100 120,107" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M70,50 Q65,64 70,78 Q65,90 70,99" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M83,50 Q79,65 83,79 Q79,93 83,99" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M107,50 Q111,65 107,79 Q111,93 107,99" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M120,50 Q125,64 120,78 Q125,90 120,99" stroke="#3377cc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
   <!-- Central tentacles -->
-  <path d="M91,60 Q87,77 91,94 Q87,104 91,107" stroke="#88ccff" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <path d="M99,60 Q103,77 99,94 Q103,104 99,107" stroke="#88ccff" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M91,50 Q87,67 91,84 Q87,95 91,100" stroke="#88ccff" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M99,50 Q103,67 99,84 Q103,95 99,100" stroke="#88ccff" stroke-width="4" fill="none" stroke-linecap="round"/>
 </svg>
