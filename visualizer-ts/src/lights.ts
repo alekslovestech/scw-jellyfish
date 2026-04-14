@@ -1,6 +1,11 @@
 import * as THREE from "three";
-import type { Config } from "./config";
-import { bellProfile } from "./shapes"; // Import the curve math
+import { cfg, type Config } from "./config";
+import { bellProfile } from "./shapes";
+
+// ── Shared Resources ─────────────────────────────────────────────────────────
+// We create these ONCE and reuse them for every light to save memory and GPU time.
+const DOT_GEO = new THREE.SphereGeometry(0.04, 6, 6);
+const DOT_MAT = new THREE.MeshBasicMaterial({ color: cfg.colors.dots });
 
 // ── Point Generators ─────────────────────────────────────────────────────────
 
@@ -57,12 +62,14 @@ export function getBellPoints(cfg: Config): THREE.Vector3[] {
   return points;
 }
 
-// ── Mesh Helper ──────────────────────────────────────────────────────────────
+// ── Efficient Mesh Helper ────────────────────────────────────────────────────
 
-export function createLightMesh(pos: THREE.Vector3, color: number = 0x00ff00): THREE.Mesh {
-  const geo = new THREE.SphereGeometry(0.04, 6, 6);
-  const mat = new THREE.MeshBasicMaterial({ color });
-  const mesh = new THREE.Mesh(geo, mat);
+/**
+ * Creates a mesh using SHARED geometry and materials.
+ * This is significantly faster than creating new objects every time.
+ */
+export function createLightMesh(pos: THREE.Vector3): THREE.Mesh {
+  const mesh = new THREE.Mesh(DOT_GEO, DOT_MAT);
   mesh.position.copy(pos);
   return mesh;
 }

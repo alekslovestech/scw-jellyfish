@@ -29,6 +29,7 @@ export interface ColorsConfig {
   bell:       number;
   tentacles:  number;
   central:    number;
+  dots:       number;
 }
 
 export interface LightingConfig {
@@ -75,6 +76,8 @@ export const cfg: Config = {
     bell:       0x55aaee,
     tentacles:  0x3377cc,
     central:    0x88ccff,
+    dots:       0x9900ff,   // 0x00ff00  Green, 0xff0000 Red, 0x9900ff Purple, 0x00aaff  Blue
+  
   },
   lighting: {
     ambient_color:     0x334455,
