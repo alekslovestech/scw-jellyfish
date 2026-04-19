@@ -14,16 +14,18 @@ export class LEDRenderer {
   constructor(private ledSystem: LEDSystem, private animationManager: AnimationManager) {
     this.geometry = new THREE.BufferGeometry();
 
-    this.material = new THREE.PointsMaterial({
+   this.material = new THREE.PointsMaterial({
       size: 0.15,
       vertexColors: true,
       transparent: true,
       opacity: 1,
       depthWrite: false,
+      depthTest: false,
       blending: THREE.AdditiveBlending,
     });
 
     this.points = new THREE.Points(this.geometry, this.material);
+    this.points.renderOrder = 999;
 
     this.rebuild();
   }

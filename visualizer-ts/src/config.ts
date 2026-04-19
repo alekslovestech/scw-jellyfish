@@ -1,3 +1,9 @@
+import { LEDAnimation } from "./animations/types";
+import { droppingRain } from "./animations/droppingRain";
+import { fallingRain } from "./animations/fallingRain";
+import { colorCycle } from "./animations/colorCycle";
+
+
 export interface BellConfig {
   radius: number;
 }
@@ -42,6 +48,7 @@ export interface LightingConfig {
 }
 
 export interface Config {
+  animation: LEDAnimation;
   bell: BellConfig;
   tentacles: TentacleConfig;
   central: CentralConfig;
@@ -87,6 +94,7 @@ export const cfg: Config = {
     fill_color:        0x223366,
     fill_intensity:    60,
   },
+  animation: colorCycle,      // change this for new animation
   size_ratio: 0.6,
   z_offset: -3.0,
   sizes: [

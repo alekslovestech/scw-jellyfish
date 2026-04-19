@@ -7,7 +7,7 @@ import { buildPanel } from "./panel";
 import { LEDSystem } from "./core/ledSystem";
 import { LEDRenderer } from "./core/ledRenderer";
 import { AnimationManager } from "./core/animationManager";
-import { colorCycle } from "./animations/colorCycle";
+
 
 // ── Renderer ────────────────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -83,7 +83,7 @@ const centralMat = new THREE.MeshPhongMaterial({
 // ── LED SYSTEM ──────────────────────────────────────────────────────────────
 const ledSystem = new LEDSystem();
 const animationManager = new AnimationManager();
-animationManager.set(colorCycle);
+animationManager.set(cfg.animation);
 const ledRenderer = new LEDRenderer(ledSystem, animationManager);
 scene.add(ledRenderer.getObject());
 
