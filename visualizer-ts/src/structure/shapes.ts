@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { Config } from "./config";
+import type { Config } from "../config";
 
 const N_S = 60;
 const N_U = 20;
