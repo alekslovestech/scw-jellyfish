@@ -131,7 +131,7 @@ function draw(): void {
 }
 
 draw();
-buildPanel(draw);
+buildPanel(draw, animationManager);
 
 // ── Render loop ─────────────────────────────────────────────────────────────
 function animate(): void {

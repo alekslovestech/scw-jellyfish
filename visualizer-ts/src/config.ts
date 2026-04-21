@@ -1,6 +1,4 @@
 import { LEDAnimation } from "./animations/types";
-import { droppingRain } from "./animations/droppingRain";
-import { fallingRain } from "./animations/fallingRain";
 import { colorCycle } from "./animations/colorCycle";
 
 
@@ -84,7 +82,6 @@ export const cfg: Config = {
     tentacles:  0x3377cc,
     central:    0x88ccff,
     dots:       0x9900ff,   // 0x00ff00  Green, 0xff0000 Red, 0x9900ff Purple, 0x00aaff  Blue
-  
   },
   lighting: {
     ambient_color:     0x334455,
