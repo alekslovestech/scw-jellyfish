@@ -34,8 +34,8 @@ const COLOR_B = 1.0;
 
 // ─────────────────────────────────────────────────────────────
 
-export const droppingRain = {
-  name: "droppingRain",
+export const magicDust = {
+  name: "magicDust",
 
   update(leds: LED[], time: number) {
     const sceneRange = SCENE_Z_TOP - SCENE_Z_BOTTOM; // positive number
