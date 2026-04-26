@@ -45,28 +45,27 @@ export class Jellyfish {
     );
 
     // ─────────────────────────────
-    // LED REGISTRATION (CLEAN VERSION)
+    // LED REGISTRATION
     // ─────────────────────────────
-
-
-    this.id = id; 
 
     // 1. Bell LEDs
     for (const p of getBellPoints(cfg)) {
       this.leds.addLED({
         group: "bell",
-        jellyId: this.id, 
+        jellyId: this.id,
+        t: p.t, // Added to support spatial effects
         position: p.position.clone().multiplyScalar(relative_size).add(this.position),
       });
     }
 
-    // 2. Tentacle LEDs
+    // 2. Outer Tentacle LEDs
     for (let k = 0; k < cfg.tentacles.count; k++) {
       const angle = (k * 2 * Math.PI) / cfg.tentacles.count;
       for (const p of getTentaclePoints(cfg, angle)) {
         this.leds.addLED({
           group: "tentacle",
-          jellyId: this.id, 
+          jellyId: this.id,
+          t: p.t, // Added to support the worm effect
           position: p.position.clone().multiplyScalar(relative_size).add(this.position),
         });
       }
@@ -78,7 +77,8 @@ export class Jellyfish {
       for (const p of getCentralPoints(cfg, angle)) {
         this.leds.addLED({
           group: "central",
-          jellyId: this.id, 
+          jellyId: this.id,
+          t: p.t, // Added to support the worm effect
           position: p.position.clone().multiplyScalar(relative_size).add(this.position),
         });
       }

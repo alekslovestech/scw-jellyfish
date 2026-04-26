@@ -6,6 +6,7 @@ export type LED = {
   id: number;
   group: LEDGroup;
   jellyId?: number;
+  t?: number;
   position: THREE.Vector3;
 
   // runtime animated values only
@@ -36,7 +37,8 @@ addLED(led: Omit<LED, "id" | "color" | "intensity"> & { jellyId?: number } & Par
     id: this.nextId++,
     group: led.group,
     position: led.position,
-    jellyId: led.jellyId, // Now TypeScript knows this is valid!
+    jellyId: led.jellyId,
+    t: led.t,
 
     // Default values
     intensity: led.intensity ?? 1,
