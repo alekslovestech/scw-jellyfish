@@ -4,8 +4,11 @@ import { colorCycle } from "./animations/colorCycle";
 import {individualColorCycle } from "./animations/individualColorCycle"
 import { magicDust } from "./animations/magicDust";
 import { fallingRain } from "./animations/fallingRain";
-import { AnimationManager } from "./core/animationManager";
 import {decoupleInnerTentacles} from "./animations/decoupleInnerTentacles"
+import { waveCascade } from "./animations/waveCascade"
+import {synchronizedJellyWave} from "./animations/synchronizedJellyWave"
+import { AnimationManager } from "./core/animationManager";
+
 
 const animations = {
   colorCycle,
@@ -13,6 +16,8 @@ const animations = {
   magicDust,
   fallingRain,
   decoupleInnerTentacles,
+  waveCascade,
+  synchronizedJellyWave,
 };
 
 export function buildPanel(redraw: () => void, animationManager: AnimationManager): void {
