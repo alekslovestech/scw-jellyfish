@@ -5,6 +5,7 @@ import { getTentaclePoints, getCentralPoints, getBellPoints } from "./lights";
 import { LEDSystem } from "../core/ledSystem";
 
 export class Jellyfish {
+  readonly id: number;
   readonly relative_size: number;
   readonly position: THREE.Vector3;
 
@@ -16,6 +17,7 @@ export class Jellyfish {
   private readonly centralGeos: THREE.BufferGeometry[];
 
   constructor(
+    id: number,
     cfg: Config,
     relative_size: number,
     x: number,
@@ -23,6 +25,7 @@ export class Jellyfish {
     z: number,
     leds: LEDSystem
   ) {
+    this.id = id;
     this.cfg = cfg;
     this.relative_size = relative_size;
     this.position = new THREE.Vector3(x, y, z);
@@ -45,33 +48,37 @@ export class Jellyfish {
     // LED REGISTRATION (CLEAN VERSION)
     // ─────────────────────────────
 
-    // Bell LEDs
+
+    this.id = id; 
+
+    // 1. Bell LEDs
     for (const p of getBellPoints(cfg)) {
       this.leds.addLED({
         group: "bell",
+        jellyId: this.id, 
         position: p.position.clone().multiplyScalar(relative_size).add(this.position),
       });
     }
 
-    // Tentacle LEDs
+    // 2. Tentacle LEDs
     for (let k = 0; k < cfg.tentacles.count; k++) {
       const angle = (k * 2 * Math.PI) / cfg.tentacles.count;
-
       for (const p of getTentaclePoints(cfg, angle)) {
         this.leds.addLED({
           group: "tentacle",
+          jellyId: this.id, 
           position: p.position.clone().multiplyScalar(relative_size).add(this.position),
         });
       }
     }
 
-    // Central LEDs
+    // 3. Central LEDs
     for (let k = 0; k < cfg.central.count; k++) {
       const angle = (k * 2 * Math.PI) / cfg.central.count;
-
       for (const p of getCentralPoints(cfg, angle)) {
         this.leds.addLED({
           group: "central",
+          jellyId: this.id, 
           position: p.position.clone().multiplyScalar(relative_size).add(this.position),
         });
       }

@@ -1,12 +1,14 @@
 import { Pane } from "tweakpane";
 import { cfg } from "./config";
 import { colorCycle } from "./animations/colorCycle";
+import {individualColorCycle } from "./animations/individualColorCycle"
 import { magicDust } from "./animations/magicDust";
 import { fallingRain } from "./animations/fallingRain";
 import { AnimationManager } from "./core/animationManager";
 
 const animations = {
   colorCycle,
+  individualColorCycle,
   magicDust,
   fallingRain,
 };

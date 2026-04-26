@@ -105,14 +105,20 @@ function draw(): void {
 
   const ringStep = cfg.bell.radius * 3;
 
-  cfg.sizes.forEach((entry, tier) => {
+  // Find this section in your main.ts and update the loop:
+
+let counter = 0; // Create a counter to give unique IDs
+
+cfg.sizes.forEach((entry, tier) => {
     const ringRadius = 2 * tier * Math.sqrt(ringStep);
     const n = entry.count;
 
     for (let i = 0; i < n; i++) {
       const angle = (i / n) * Math.PI * 2;
 
+      // Pass 'counter' as the first argument (the ID)
       const jelly = new Jellyfish(
+        counter, 
         cfg,
         cfg.size_ratio ** entry.level,
         ringRadius * Math.cos(angle),
@@ -123,11 +129,13 @@ function draw(): void {
 
       const group = jelly.toGroup(bellMat, tentMat, centralMat);
 
-      jellies.push(jelly);
+      jellies.push(jelly); // This puts them in your list
       groups.push(group);
       scene.add(group);
+      
+      counter++; // Move to the next ID
     }
-  });
+});
 }
 
 draw();

@@ -17,6 +17,8 @@ export type LED = {
   // normalized position along a strip (0 → 1), useful for waves
   t: number;
 
+  jellyId?: number; // <--- Add this line here
+
   // optional metadata for future animation use
   angle?: number;
   ring?: number;

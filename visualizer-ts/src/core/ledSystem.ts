@@ -5,10 +5,12 @@ export type LEDGroup = "bell" | "tentacle" | "central";
 export type LED = {
   id: number;
   group: LEDGroup;
+  jellyId?: number;
   position: THREE.Vector3;
 
   // runtime animated values only
   intensity: number;
+  
   color: THREE.Color;
 };
 
@@ -26,18 +28,27 @@ export class LEDSystem {
   // ─────────────────────────────
   // ADD LED (SAFE + SIMPLE)
   // ─────────────────────────────
-  addLED(led: Omit<LED, "id" | "color" | "intensity"> & Partial<Pick<LED, "color" | "intensity">>): LED {
+// Inside core/ledSystem.ts
+
+addLED(led: Omit<LED, "id" | "color" | "intensity"> & { jellyId?: number } & Partial<Pick<LED, "color" | "intensity">>): LED {
+  
   const full: LED = {
     id: this.nextId++,
     group: led.group,
     position: led.position,
+    jellyId: led.jellyId, // Now TypeScript knows this is valid!
 
-    // FORCE VISIBILITY
-    intensity: 1,
-    color: new THREE.Color(0x00ff00), // bright green
+    // Default values
+    intensity: led.intensity ?? 1,
+    color: led.color ?? new THREE.Color(0x00ff00),
   };
 
   this.leds.push(full);
+  
+  // Ensure the group exists in our organization object
+  if (!this.byGroup[full.group]) {
+    this.byGroup[full.group] = [];
+  }
   this.byGroup[full.group].push(full);
 
   return full;
