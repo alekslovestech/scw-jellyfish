@@ -5,14 +5,14 @@ import {individualColorCycle } from "./animations/individualColorCycle"
 import { magicDust } from "./animations/magicDust";
 import { fallingRain } from "./animations/fallingRain";
 import { AnimationManager } from "./core/animationManager";
-import {specialJellyEffect} from "./animations/specialJellyEffect"
+import {decoupleInnerTentacles} from "./animations/decoupleInnerTentacles"
 
 const animations = {
   colorCycle,
   individualColorCycle,
   magicDust,
   fallingRain,
-  specialJellyEffect,
+  decoupleInnerTentacles,
 };
 
 export function buildPanel(redraw: () => void, animationManager: AnimationManager): void {

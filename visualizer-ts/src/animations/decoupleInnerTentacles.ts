@@ -1,7 +1,7 @@
 import { LED } from "../core/ledSystem"; 
 
-export const specialJellyEffect = {
-  name: "specialJellyEffect",
+export const decoupleInnerTentacles = {
+  name: "decoupleInnerTentacles",
 
   update(leds: LED[], time: number) {
     for (const led of leds) {
