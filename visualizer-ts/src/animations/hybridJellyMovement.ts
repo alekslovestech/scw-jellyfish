@@ -52,11 +52,18 @@ export const hybridJellyMovement = {
       }
 
       // ---------------------------
-      // 2. OUTER SYSTEM (cool breathing glow)
+      // 2. BELL (always fully on)
       // ---------------------------
-      const pulse = Math.sin(time * 2 + id) * 0.5 + 0.5;
+      if (led.group === "bell") {
+        led.color.setRGB(1, 0, 0);
+        led.intensity = 1.0;
+      }
 
-      if (led.group === "bell" || led.group === "tentacle") {
+      // ---------------------------
+      // 3. OUTER SYSTEM (cool breathing glow)
+      // ---------------------------
+      else if (led.group === "outer") {
+        const pulse = Math.sin(time * 2 + id) * 0.5 + 0.5;
         led.color.setRGB(
           pulse * 0.75 + baseIntensity * 0.6,
           0,
@@ -65,9 +72,9 @@ export const hybridJellyMovement = {
       }
 
       // ---------------------------
-      // 3. INNER SYSTEM (bright nerve worm)
+      // 4. INNER SYSTEM (bright nerve worm)
       // ---------------------------
-      else if (led.group === "central") {
+      else if (led.group === "inner") {
         const wormPosition = t;
         const speed = time * INNER_SPEED;
 
@@ -92,7 +99,7 @@ export const hybridJellyMovement = {
       }
 
       // ---------------------------
-      // 4. DEFAULT (fallback glow)
+      // 5. DEFAULT (fallback glow)
       // ---------------------------
       else {
         led.color.setRGB(

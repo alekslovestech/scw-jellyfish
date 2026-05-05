@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export type LEDGroup = "bell" | "tentacle" | "central";
+export type LEDGroup = "inner" | "bell" | "outer";
 
 export type LED = {
   id: number;
@@ -19,9 +19,9 @@ export class LEDSystem {
   private leds: LED[] = [];
 
   private byGroup: Record<LEDGroup, LED[]> = {
+    inner: [],
     bell: [],
-    tentacle: [],
-    central: [],
+    outer: [],
   };
 
   private nextId = 0;
@@ -77,9 +77,9 @@ addLED(led: Omit<LED, "id" | "color" | "intensity"> & { jellyId?: number } & Par
   reset(): void {
     this.leds = [];
     this.byGroup = {
+      inner: [],
       bell: [],
-      tentacle: [],
-      central: [],
+      outer: [],
     };
     this.nextId = 0;
   }

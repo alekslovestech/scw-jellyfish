@@ -92,7 +92,7 @@ function makeTube(
 
 // ── Outer tentacle ────────────────────────────────────────────────────────────
 export function makeTentacle(cfg: Config, angle: number): THREE.BufferGeometry {
-  const { wave_amplitude: amp, wave_frequency: freq, length } = cfg.tentacles;
+  const { wave_amplitude: amp, wave_frequency: freq, length } = cfg.tentacle;
   const a = angle;
 
   const spineX: number[] = [],
@@ -127,7 +127,7 @@ export function makeTentacle(cfg: Config, angle: number): THREE.BufferGeometry {
     bz,
     -Math.sin(a),
     Math.cos(a),
-    cfg.tentacles.radius,
+    cfg.tentacle.radius,
   );
 }
 
@@ -141,7 +141,7 @@ export function makeCentralTentacle(
     wave_frequency: freq,
     length,
     ring_radius,
-  } = cfg.central;
+  } = cfg.inner;
   const a = angle;
 
   const spineX: number[] = [],
@@ -175,7 +175,7 @@ export function makeCentralTentacle(
     bz,
     -Math.sin(a),
     Math.cos(a),
-    cfg.central.radius,
+    cfg.inner.radius,
   );
 }
 
