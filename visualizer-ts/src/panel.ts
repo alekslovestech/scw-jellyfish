@@ -7,10 +7,16 @@ import { sparkleDust } from "./animations/sparkleDust";
 import {decoupleInnerTentacles} from "./animations/decoupleInnerTentacles"
 import { waveCascade } from "./animations/waveCascade"
 import {synchronizedJellyWave} from "./animations/synchronizedJellyWave"
+import{movementSimulation} from "./animations/movementSimulation"
+import {hybridJellyMovement} from "./animations/hybridJellyMovement"
+import { indexTest } from "./animations/indexTest";
+import { directionTest } from "./animations/directionTest";
 import { AnimationManager } from "./core/animationManager";
 
 
 const animations = {
+  indexTest,
+  directionTest,
   colorCycle,
   individualColorCycle,
   sparkleDust,
@@ -18,6 +24,8 @@ const animations = {
   decoupleInnerTentacles,
   waveCascade,
   synchronizedJellyWave,
+  movementSimulation,
+  hybridJellyMovement,
 };
 
 export function buildPanel(redraw: () => void, animationManager: AnimationManager): void {

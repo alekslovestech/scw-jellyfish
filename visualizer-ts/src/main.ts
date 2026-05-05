@@ -65,7 +65,7 @@ const bellMat = new THREE.MeshPhongMaterial({
 });
 
 const tentMat = new THREE.MeshPhongMaterial({
-  color: cfg.colors.tentacles,
+  color: cfg.colors.outer,
   transparent: true,
   opacity: 0.75,
   side: THREE.DoubleSide,
@@ -73,7 +73,7 @@ const tentMat = new THREE.MeshPhongMaterial({
 });
 
 const centralMat = new THREE.MeshPhongMaterial({
-  color: cfg.colors.central,
+  color: cfg.colors.inner,
   transparent: true,
   opacity: 0.75,
   side: THREE.DoubleSide,
