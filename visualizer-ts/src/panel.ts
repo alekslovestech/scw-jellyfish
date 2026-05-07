@@ -63,6 +63,30 @@ export function buildPanel(redraw: () => void, animationManager: AnimationManage
       label: "Z offset",
     })
     .on("change", redraw);
+  sizes
+    .addBinding(cfg, "orbital_radius", {
+      min: 1,
+      max: 20,
+      step: 0.5,
+      label: "orbital radius",
+    })
+    .on("change", redraw);
+  sizes
+    .addBinding(cfg, "orbital_random", {
+      min: 0,
+      max: 5,
+      step: 0.25,
+      label: "orbital random",
+    })
+    .on("change", redraw);
+  sizes
+    .addBinding(cfg, "height_random", {
+      min: 0,
+      max: 5,
+      step: 0.25,
+      label: "height random",
+    })
+    .on("change", redraw);
   cfg.sizes.forEach((entry) => {
     if (entry.level === 0) return;
     const folder = sizes.addFolder({ title: `Level ${entry.level + 1}` });
