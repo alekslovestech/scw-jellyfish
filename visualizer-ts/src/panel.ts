@@ -11,6 +11,9 @@ import{movementSimulation} from "./animations/movementSimulation"
 import {hybridJellyMovement} from "./animations/hybridJellyMovement"
 import { indexTest } from "./animations/indexTest";
 import { directionTest } from "./animations/directionTest";
+import { fireGlow } from "./animations/fireGlow";
+import { fireGlowScroll } from "./animations/fireGlowScroll";
+import { fireGlowSim } from "./animations/fireGlowSim";
 import { AnimationManager } from "./core/animationManager";
 
 
@@ -18,6 +21,9 @@ const animations = {
   indexTest,
   directionTest,
   colorCycle,
+  fireGlow,
+  fireGlowScroll,
+  fireGlowSim,
   individualColorCycle,
   magicDust,
   fallingRain,
