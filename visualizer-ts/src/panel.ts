@@ -9,6 +9,7 @@ import { waveCascade } from "./animations/waveCascade"
 import {synchronizedJellyWave} from "./animations/synchronizedJellyWave"
 import{movementSimulation} from "./animations/movementSimulation"
 import {hybridJellyMovement} from "./animations/hybridJellyMovement"
+import { waterfall } from "./animations/waterfall";
 import { indexTest } from "./animations/indexTest";
 import { directionTest } from "./animations/directionTest";
 import { fireGlow } from "./animations/fireGlow";
@@ -27,6 +28,7 @@ const animations = {
   individualColorCycle,
   magicDust,
   fallingRain,
+  waterfall,
   decoupleInnerTentacles,
   waveCascade,
   synchronizedJellyWave,
