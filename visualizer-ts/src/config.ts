@@ -71,8 +71,11 @@ export interface Config {
   inner: InnerConfig;        // inner tentacle geometry
   colors: ColorsConfig;
   lighting: LightingConfig;
-  size_ratio: number;
-  z_offset: number;
+  size_ratio: number; // scale factor per level (e.g. 0.6 → each level is 60% of previous)
+  z_offset: number; // Z step between levels; level N sits at N * z_offset
+  orbital_radius: number; // orbital radius for smaller fish
+  orbital_random: number; // random offset for orbital radius
+  height_random: number; // random offset for height (z position)
   sizes: JellyfishSizeConfig[];
 }
 
@@ -126,9 +129,11 @@ export const cfg: Config = {
   animation: colorCycle,
   size_ratio: 0.6,
   z_offset: -3.0,
+  orbital_radius: 8.0,
+  orbital_random: 1.5,
+  height_random: 1.0,
   sizes: [
     { level: 0, count: 1 },
-    { level: 1, count: 4 },
-    { level: 2, count: 8 },
+    { level: 1, count: 8 },
   ],
 };
