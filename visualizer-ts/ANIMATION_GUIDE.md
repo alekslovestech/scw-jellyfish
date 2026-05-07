@@ -70,21 +70,15 @@ Jelly 1 example (starts at ID 800):
 
 Call `getLEDDescriptor(led.id)` and you receive a descriptor with these fields:
 
-```
-jellyId       Which jellyfish this LED belongs to (0–12)
-stripIndex    Which physical strip within that jellyfish (0–7 standard, 0–15 hero)
-angle_deg     Rotational angle of that strip (0°, 45°, 90° … 315°)
-posInStrip    Raw position inside the strip (0–49)
-segment       Which section: "inner" | "bell" | "outer"
-posInSegment  Position within that section
-              → inner:  0 = tip (bottom),  29 or 49 = root (top)
-              → bell:   0 = inner edge,    9 or 24 = outer rim
-              → outer:  0 = root (top),    9 or 24 = tip (bottom)
-t             Normalized 0→1 within the segment (always 0 at one end, 1 at the other)
-              → inner:  0 = tip (bottom),  1 = root (top)
-              → bell:   0 = inner edge,    1 = outer rim
-              → outer:  0 = root (top),    1 = tip (bottom)
-```
+| Field Name | Meaning |
+| --- | --- |
+| jellyId | Which jellyfish this LED belongs to (0–12) |
+| stripIndex | Which physical strip within that jellyfish (0–7 standard, 0–15 hero) |
+| angle_deg | Rotational angle of that strip (0°, 45°, 90° … 315°) |
+| posInStrip | Raw position inside the strip (0–49) |
+| segment | Which section: "inner" \| "bell" \| "outer" |
+| posInSegment | Position within that section: inner: 0 = tip (bottom), 29 or 49 = root (top); bell: 0 = inner edge, 9 or 24 = outer rim; outer: 0 = root (top), 9 or 24 = tip (bottom) |
+| <center>t</center> | Normalized 0→1 within the segment (always 0 at one end, 1 at the other): inner: 0 = tip (bottom), 1 = root (top); bell: 0 = inner edge, 1 = outer rim; outer: 0 = root (top), 1 = tip (bottom) |
 
 ### Segment sizes
 
@@ -101,22 +95,17 @@ t             Normalized 0→1 within the segment (always 0 at one end, 1 at the
 `t` is a number from **0.0 to 1.0** that tells you where along its segment a LED sits.
 It is the same regardless of jellyfish size or type.
 
-```
-INNER TENTACLE
-  t = 0.0 ——— tip (very bottom, furthest from bell)
-  t = 0.5 ——— middle of the tentacle
-  t = 1.0 ——— root (top, connects to bell)
-
-BELL
-  t = 0.0 ——— inner edge (closest to centre axis)
-  t = 0.5 ——— middle of the bell dome
-  t = 1.0 ——— outer rim (where tentacles attach)
-
-OUTER TENTACLE
-  t = 0.0 ——— root (top, connects to bell rim)
-  t = 0.5 ——— middle of the tentacle
-  t = 1.0 ——— tip (very bottom, furthest from bell)
-```
+| Segment | t Value | Position |
+| --- | --- | --- |
+| INNER TENTACLE | 0.0 | tip (very bottom, furthest from bell) |
+| | 0.5 | middle of the tentacle |
+| | 1.0 | root (top, connects to bell) |
+| BELL | 0.0 | inner edge (closest to centre axis) |
+| | 0.5 | middle of the bell dome |
+| | 1.0 | outer rim (where tentacles attach) |
+| OUTER TENTACLE | 0.0 | root (top, connects to bell rim) |
+| | 0.5 | middle of the tentacle |
+| | 1.0 | tip (very bottom, furthest from bell) |
 
 **Key rule:** `t` always goes 0→1 in the direction the strip is wired.
 For "bottom to top" motion on inner tentacles use `t` directly.
