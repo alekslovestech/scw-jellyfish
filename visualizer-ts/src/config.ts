@@ -1,5 +1,5 @@
 import { LEDAnimation } from "./animations/types";
-import { colorCycle } from "./animations/colorCycle";
+import { waveCascade } from "./animations/waveCascade";
 
 // Physical LED strip layout — standard jellyfish (jellies 1–12)
 export interface HardwareConfig {
@@ -126,7 +126,7 @@ export const cfg: Config = {
     fill_color: 0x223366,
     fill_intensity: 60,
   },
-  animation: colorCycle,
+  animation: waveCascade,
   size_ratio: 0.6,
   z_offset: -3.0,
   orbital_radius: 8.0,
