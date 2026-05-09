@@ -7,17 +7,33 @@ import { sparkleDust } from "./animations/sparkleDust";
 import {decoupleInnerTentacles} from "./animations/decoupleInnerTentacles"
 import { waveCascade } from "./animations/waveCascade"
 import {synchronizedJellyWave} from "./animations/synchronizedJellyWave"
+import{movementSimulation} from "./animations/movementSimulation"
+import {hybridJellyMovement} from "./animations/hybridJellyMovement"
+import { waterfall } from "./animations/waterfall";
+import { indexTest } from "./animations/indexTest";
+import { directionTest } from "./animations/directionTest";
+import { fireGlow } from "./animations/fireGlow";
+import { fireGlowScroll } from "./animations/fireGlowScroll";
+import { fireGlowSim } from "./animations/fireGlowSim";
 import { AnimationManager } from "./core/animationManager";
 
 
 const animations = {
+  indexTest,
+  directionTest,
   colorCycle,
+  fireGlow,
+  fireGlowScroll,
+  fireGlowSim,
   individualColorCycle,
   sparkleDust,
   fallingRain,
+  waterfall,
   decoupleInnerTentacles,
   waveCascade,
   synchronizedJellyWave,
+  movementSimulation,
+  hybridJellyMovement,
 };
 
 export function buildPanel(redraw: () => void, animationManager: AnimationManager): void {
@@ -56,6 +72,30 @@ export function buildPanel(redraw: () => void, animationManager: AnimationManage
       max: 0,
       step: 1,
       label: "Z offset",
+    })
+    .on("change", redraw);
+  sizes
+    .addBinding(cfg, "orbital_radius", {
+      min: 1,
+      max: 20,
+      step: 0.5,
+      label: "orbital radius",
+    })
+    .on("change", redraw);
+  sizes
+    .addBinding(cfg, "orbital_random", {
+      min: 0,
+      max: 5,
+      step: 0.25,
+      label: "orbital random",
+    })
+    .on("change", redraw);
+  sizes
+    .addBinding(cfg, "height_random", {
+      min: 0,
+      max: 5,
+      step: 0.25,
+      label: "height random",
     })
     .on("change", redraw);
   cfg.sizes.forEach((entry) => {

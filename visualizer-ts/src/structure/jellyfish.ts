@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { Config } from "../config";
 import { makeBell, makeTentacle, makeCentralTentacle } from "./shapes";
-import { getTentaclePoints, getCentralPoints, getBellPoints } from "./lights";
+import { getStripPoints, getInnerOnlyStripPoints, getBellOuterStripPoints } from "./lights";
 import { LEDSystem } from "../core/ledSystem";
 
 export class Jellyfish {
@@ -13,8 +13,8 @@ export class Jellyfish {
   private readonly leds: LEDSystem;
 
   private readonly bellGeo: THREE.BufferGeometry;
-  private readonly tentacleGeos: THREE.BufferGeometry[];
-  private readonly centralGeos: THREE.BufferGeometry[];
+  private readonly outerGeos: THREE.BufferGeometry[];
+  private readonly innerGeos: THREE.BufferGeometry[];
 
   constructor(
     id: number,
@@ -32,55 +32,56 @@ export class Jellyfish {
     this.leds = leds;
 
     // ─────────────────────────────
-    // Geometry
+    // Geometry (visual mesh only)
     // ─────────────────────────────
     this.bellGeo = makeBell(cfg);
 
-    this.tentacleGeos = Array.from({ length: cfg.tentacles.count }, (_, k) =>
-      makeTentacle(cfg, (k * 2 * Math.PI) / cfg.tentacles.count)
+    this.outerGeos = Array.from(
+      { length: cfg.hardware.strips_per_jelly },
+      (_, k) => makeTentacle(cfg, (k * 2 * Math.PI) / cfg.hardware.strips_per_jelly)
     );
 
-    this.centralGeos = Array.from({ length: cfg.central.count }, (_, k) =>
-      makeCentralTentacle(cfg, (k * 2 * Math.PI) / cfg.central.count)
+    this.innerGeos = Array.from(
+      { length: cfg.hardware.strips_per_jelly },
+      (_, k) => makeCentralTentacle(cfg, (k * 2 * Math.PI) / cfg.hardware.strips_per_jelly)
     );
 
     // ─────────────────────────────
-    // LED REGISTRATION
+    // LED registration
     // ─────────────────────────────
-
-    // 1. Bell LEDs
-    for (const p of getBellPoints(cfg)) {
-      this.leds.addLED({
-        group: "bell",
-        jellyId: this.id,
-        t: p.t, // Added to support spatial effects
-        position: p.position.clone().multiplyScalar(relative_size).add(this.position),
-      });
-    }
-
-    // 2. Outer Tentacle LEDs
-    for (let k = 0; k < cfg.tentacles.count; k++) {
-      const angle = (k * 2 * Math.PI) / cfg.tentacles.count;
-      for (const p of getTentaclePoints(cfg, angle)) {
-        this.leds.addLED({
-          group: "tentacle",
-          jellyId: this.id,
-          t: p.t, // Added to support the worm effect
-          position: p.position.clone().multiplyScalar(relative_size).add(this.position),
-        });
+    if (id === 0) {
+      // Hero jelly: 16 strips (8 inner-only + 8 bell+outer)
+      for (let s = 0; s < cfg.jelly0.inner_strips; s++) {
+        for (const p of getInnerOnlyStripPoints(cfg, s)) {
+          this.leds.addLED({
+            group: p.segment,
+            jellyId: this.id,
+            t: p.t,
+            position: p.position.clone().multiplyScalar(relative_size).add(this.position),
+          });
+        }
       }
-    }
-
-    // 3. Central LEDs
-    for (let k = 0; k < cfg.central.count; k++) {
-      const angle = (k * 2 * Math.PI) / cfg.central.count;
-      for (const p of getCentralPoints(cfg, angle)) {
-        this.leds.addLED({
-          group: "central",
-          jellyId: this.id,
-          t: p.t, // Added to support the worm effect
-          position: p.position.clone().multiplyScalar(relative_size).add(this.position),
-        });
+      for (let s = 0; s < cfg.jelly0.bell_outer_strips; s++) {
+        for (const p of getBellOuterStripPoints(cfg, s)) {
+          this.leds.addLED({
+            group: p.segment,
+            jellyId: this.id,
+            t: p.t,
+            position: p.position.clone().multiplyScalar(relative_size).add(this.position),
+          });
+        }
+      }
+    } else {
+      // Standard jelly: 8 strips × 50 LEDs (inner tip → bell → outer tip)
+      for (let s = 0; s < cfg.hardware.strips_per_jelly; s++) {
+        for (const p of getStripPoints(cfg, s)) {
+          this.leds.addLED({
+            group: p.segment,
+            jellyId: this.id,
+            t: p.t,
+            position: p.position.clone().multiplyScalar(relative_size).add(this.position),
+          });
+        }
       }
     }
   }
@@ -90,8 +91,8 @@ export class Jellyfish {
   // ─────────────────────────────
   toGroup(
     bellMat: THREE.Material,
-    tentMat: THREE.Material,
-    centralMat: THREE.Material
+    outerMat: THREE.Material,
+    innerMat: THREE.Material
   ): THREE.Group {
     const group = new THREE.Group();
 
@@ -100,12 +101,12 @@ export class Jellyfish {
 
     group.add(new THREE.Mesh(this.bellGeo, bellMat));
 
-    for (const geo of this.tentacleGeos) {
-      group.add(new THREE.Mesh(geo, tentMat));
+    for (const geo of this.outerGeos) {
+      group.add(new THREE.Mesh(geo, outerMat));
     }
 
-    for (const geo of this.centralGeos) {
-      group.add(new THREE.Mesh(geo, centralMat));
+    for (const geo of this.innerGeos) {
+      group.add(new THREE.Mesh(geo, innerMat));
     }
 
     return group;
@@ -113,7 +114,7 @@ export class Jellyfish {
 
   dispose(): void {
     this.bellGeo.dispose();
-    this.tentacleGeos.forEach((g) => g.dispose());
-    this.centralGeos.forEach((g) => g.dispose());
+    this.outerGeos.forEach((g) => g.dispose());
+    this.innerGeos.forEach((g) => g.dispose());
   }
 }

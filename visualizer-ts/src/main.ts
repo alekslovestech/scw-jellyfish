@@ -65,7 +65,7 @@ const bellMat = new THREE.MeshPhongMaterial({
 });
 
 const tentMat = new THREE.MeshPhongMaterial({
-  color: cfg.colors.tentacles,
+  color: cfg.colors.outer,
   transparent: true,
   opacity: 0.75,
   side: THREE.DoubleSide,
@@ -73,7 +73,7 @@ const tentMat = new THREE.MeshPhongMaterial({
 });
 
 const centralMat = new THREE.MeshPhongMaterial({
-  color: cfg.colors.central,
+  color: cfg.colors.inner,
   transparent: true,
   opacity: 0.75,
   side: THREE.DoubleSide,
@@ -103,27 +103,41 @@ function draw(): void {
   // reset LED system safely
   ledSystem.reset();
 
-  const ringStep = cfg.bell.radius * 3;
-
-  // Find this section in your main.ts and update the loop:
-
-let counter = 0; // Create a counter to give unique IDs
+  let counter = 0; // Create a counter to give unique IDs
 
 cfg.sizes.forEach((entry, tier) => {
-    const ringRadius = 2 * tier * Math.sqrt(ringStep);
     const n = entry.count;
 
     for (let i = 0; i < n; i++) {
       const angle = (i / n) * Math.PI * 2;
+      
+      // Determine position: tier 0 at center, tier > 0 at orbital radius
+      let x: number, y: number, z: number;
+      if (entry.level === 0) {
+        // Main jellyfish at center
+        x = 0;
+        y = 0;
+      } else {
+        // Smaller fish at orbital radius with random offset
+        const randomRadius = cfg.orbital_radius + (Math.random() - 0.5) * 2 * cfg.orbital_random;
+        x = randomRadius * Math.cos(angle);
+        y = randomRadius * Math.sin(angle);
+      }
+      
+      // Randomize height for smaller fish
+      z = entry.level * cfg.z_offset;
+      if (entry.level > 0) {
+        z += (Math.random() - 0.5) * 2 * cfg.height_random;
+      }
 
       // Pass 'counter' as the first argument (the ID)
       const jelly = new Jellyfish(
         counter, 
         cfg,
         cfg.size_ratio ** entry.level,
-        ringRadius * Math.cos(angle),
-        ringRadius * Math.sin(angle),
-        entry.level * cfg.z_offset,
+        x,
+        y,
+        z,
         ledSystem
       );
 

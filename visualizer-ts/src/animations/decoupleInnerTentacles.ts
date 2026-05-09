@@ -8,7 +8,7 @@ export const decoupleInnerTentacles = {
       const id = led.jellyId ?? 0;
 
       // 1. BELL & OUTER TENTACLES: Blinking Blue
-      if (led.group === "bell" || led.group === "tentacle") {
+      if (led.group === "bell" || led.group === "outer") {
         // Create a blinking speed (Sine wave goes from -1 to 1)
         // We add the id to the time so they don't all blink at the exact same moment
         const blink = Math.sin(time * 3 + id) * 0.5 + 0.5; 
@@ -18,7 +18,7 @@ export const decoupleInnerTentacles = {
       } 
       
       // 2. INNER TENTACLES: Red Worm Effect
-      else if (led.group === "central") {
+      else if (led.group === "inner") {
         // 'led.t' is the position from 0 (top) to 1 (bottom)
         // We use it to create a "wave" that travels down the strand
         const wormPosition = (led.t ?? 0);
