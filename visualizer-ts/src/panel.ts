@@ -6,39 +6,43 @@ import { fallingRain } from "./animations/fallingRain";
 import { sparkleDust } from "./animations/sparkleDust";
 import {decoupleInnerTentacles} from "./animations/decoupleInnerTentacles"
 import { waveCascade } from "./animations/waveCascade"
-import {synchronizedJellyWave} from "./animations/synchronizedJellyWave"
 import{movementSimulation} from "./animations/movementSimulation"
 import {hybridJellyMovement} from "./animations/hybridJellyMovement"
 import { waterfall } from "./animations/waterfall";
-import { indexTest } from "./animations/indexTest";
-import { directionTest } from "./animations/directionTest";
-import { fireGlow } from "./animations/fireGlow";
-import { fireGlowScroll } from "./animations/fireGlowScroll";
-import { fireGlowSim } from "./animations/fireGlowSim";
+import { fireExplosion } from "./animations/fireExplosion";
+import { innerSpreadWave } from "./animations/innerSpreadWave";
+import { rainbowWave } from "./animations/rainbowWave";
+import { nuclearJellyfish } from "./animations/nuclearJellyfish";
+import { fireSpread } from "./animations/fireSpread";
 import { AnimationManager } from "./core/animationManager";
 
 
 const animations = {
-  indexTest,
-  directionTest,
   colorCycle,
-  fireGlow,
-  fireGlowScroll,
-  fireGlowSim,
+  fireExplosion,
+  fireSpread,
   individualColorCycle,
   sparkleDust,
   fallingRain,
   waterfall,
   decoupleInnerTentacles,
   waveCascade,
-  synchronizedJellyWave,
   movementSimulation,
   hybridJellyMovement,
+  innerSpreadWave,
+  rainbowWave,
+  nuclearJellyfish,
 };
 
 export function buildPanel(redraw: () => void, animationManager: AnimationManager): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pane = new Pane({ title: "Jellyfish" }) as any;
+
+  const WIP_KEYS = new Set([
+    "colorCycle", "individualColorCycle", "decoupleInnerTentacles",
+    "movementSimulation", "hybridJellyMovement", "rainbowWave",
+    "innerSpreadWave", "nuclearJellyfish",
+  ]);
 
   pane
     .addBlade({
@@ -48,7 +52,7 @@ export function buildPanel(redraw: () => void, animationManager: AnimationManage
         text: key,
         value: key,
       })),
-      value: "colorCycle",
+      value: "waveCascade",
     })
     .on("change", (event: any) => {
       const selectedAnimation = animations[event.value as keyof typeof animations];
@@ -56,6 +60,16 @@ export function buildPanel(redraw: () => void, animationManager: AnimationManage
       animationManager.set(selectedAnimation);
       redraw();
     });
+
+  // Dim WIP / secondary animations in the dropdown after Tweakpane renders the DOM
+  requestAnimationFrame(() => {
+    const select = pane.element.querySelector("select") as HTMLSelectElement | null;
+    if (select) {
+      Array.from(select.options).forEach((opt) => {
+        if (WIP_KEYS.has(opt.value)) opt.style.color = "#888";
+      });
+    }
+  });
 
   const sizes = pane.addFolder({ title: "Sizes" });
   sizes

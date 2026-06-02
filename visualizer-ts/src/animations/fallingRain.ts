@@ -1,83 +1,81 @@
 import { LED } from "../core/ledSystem";
+import { LEDAnimation } from "./types";
 
-// ─────────────────────────────────────────────────────────────
-// RAIN ANIMATION SETTINGS
-// ─────────────────────────────────────────────────────────────
+// ── Tuning ────────────────────────────────────────────────────────────────────
 
-const SPEED = 1.0;
-// How fast drops fall. Higher = faster.
+const SPEED          = 0.9;  // vertPos units / second
+const SPEED_VARIANCE = 0.75; // high variance → drops fall at very different speeds
+const NUM_DROPS      = 7;    // more simultaneous drops per strip = dense rain
+const DROP_SPACING   = 0.13; // tighter spacing between drops
+const TRAIL_LENGTH   = 0.08; // short sharp drops
 
-const TRAIL_LENGTH = 0.2;
-// Drop tail length as a fraction of the scene (0 to 1).
+// Pure blue — no white component
+const HEAD_R = 0.0;
+const HEAD_G = 0.15;
+const HEAD_B = 1.0;
 
-const NUM_DROPS = 20;
-// Simultaneous drops per LED column.
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const SPEED_VARIANCE = 0.6;
-// Speed variation between drops. 0 = uniform, 1 = chaotic.
+// vertPos: 0 = bell center (top), 1 = tentacle tip (bottom).
+// Bell + outer form one continuous path; inner is its own path.
+function getVertPos(group: string, t: number): number {
+  if (group === "bell")  return t * 0.5;       // center(t=0)→rim(t=1) maps to 0→0.5
+  if (group === "outer") return 0.5 + t * 0.5; // root(t=0)→tip(t=1) maps to 0.5→1
+  return 1 - t;                                 // inner root(t=1)=0, tip(t=0)=1
+}
 
-const DROP_SPACING = 0.5;
-// Distribution spread of drops across the scene.
+// ── Animation ─────────────────────────────────────────────────────────────────
 
-const SCENE_Z_TOP = 0.25;
-// Top of the scene (close to camera, where rain enters).
-
-const SCENE_Z_BOTTOM = -7.80;
-// Bottom of the scene (away from camera, where rain exits).
-
-const PAUSE_DURATION = .2;
-// How long (seconds) the scene holds after all drops land before resetting.
-
-const COLOR_R = 0.0;
-const COLOR_G = 0.2;
-const COLOR_B = 1.0;
-
-// ─────────────────────────────────────────────────────────────
-
-export const fallingRain = {
+export const fallingRain: LEDAnimation = {
   name: "fallingRain",
 
   update(leds: LED[], time: number) {
-    const sceneRange = SCENE_Z_TOP - SCENE_Z_BOTTOM; // positive number
-
-    const minSpeedFactor = Math.max(0.01, 1.0 - SPEED_VARIANCE / 2);
-    const slowestDropSpeed = SPEED * minSpeedFactor;
-    const cycleDuration = (1.0 + TRAIL_LENGTH) / slowestDropSpeed + PAUSE_DURATION;
-    const cycleTime = time % cycleDuration;
-
     for (const led of leds) {
-      // seed uses X and Y (the horizontal plane)
-      const seed = ((led.position.x * 9.7 + led.position.y * 7.3) % 1 + 1) % 1;
+      const group  = led.group ?? "inner";
+      const t      = led.t ?? 0;
+      const vPos   = getVertPos(group, t);
 
-      let intensity = 0;
+      // Each physical strip (50 LEDs) is one independent rain column.
+      // Golden-ratio spread ensures no two strips share the same phase.
+      const stripIndex = Math.floor(led.id / 50);
+      const stripSeed  = (stripIndex * 0.618033) % 1;
 
-      // normalize Z: 0 = top (SCENE_Z_TOP), 1 = bottom (SCENE_Z_BOTTOM)
-      // rain falls from high Z toward low Z (toward camera away)
-      const ledZ = (SCENE_Z_TOP - led.position.z) / sceneRange;
+      let intensity  = 0;
+      let headFrac   = 0; // 1 at drop head, 0 at tail — drives colour brightening
 
       for (let d = 0; d < NUM_DROPS; d++) {
-        const dropSeed = (seed + d * DROP_SPACING) % 1;
-        const dropSpeed = SPEED * (1.0 - SPEED_VARIANCE / 2 + dropSeed * SPEED_VARIANCE);
-        const dropStartOffset = dropSeed * DROP_SPACING;
-        const dropFront = (cycleTime - dropStartOffset) * dropSpeed / (1.0 + TRAIL_LENGTH);
+        // Each drop gets its own seed → independent speed variation
+        const dropSeed   = (stripSeed + d * 0.618033) % 1;
+        const dropSpeed  = SPEED * (1 - SPEED_VARIANCE / 2 + dropSeed * SPEED_VARIANCE);
+        const dropOffset = (dropSeed + d * DROP_SPACING) % 1;
+        // Front descends from 0→1 (bell→tip) and loops
+        const dropFront  = (dropOffset + time * dropSpeed) % 1;
 
-        if (dropFront < 0) continue;
-
-        const clampedFront = Math.min(dropFront, 1.0);
-        const diff = ledZ - clampedFront;
-
-        if (diff > -TRAIL_LENGTH && diff <= 0) {
-          const dropIntensity = 1 - Math.abs(diff) / TRAIL_LENGTH;
-          intensity = Math.max(intensity, dropIntensity);
+        // diff > 0: this LED is above the drop front (in the trail)
+        // diff ∈ (0, TRAIL_LENGTH): LED is lit
+        const diff = dropFront - vPos;
+        if (diff > 0 && diff < TRAIL_LENGTH) {
+          const frac = 1 - diff / TRAIL_LENGTH; // 1 at head, 0 at tail
+          if (frac > intensity) {
+            intensity = frac;
+            headFrac  = frac;
+          }
         }
       }
 
-      led.intensity = intensity;
+      if (intensity === 0) {
+        led.color.setRGB(0, 0, 0);
+        led.intensity = 0;
+        continue;
+      }
+
+      // Head is bright white-cyan, trail fades to darker blue
       led.color.setRGB(
-        COLOR_R,
-        COLOR_G * intensity,
-        COLOR_B
+        HEAD_R * headFrac,
+        HEAD_G * headFrac,
+        HEAD_B
       );
+      led.intensity = intensity;
     }
   },
 };
