@@ -1,4 +1,4 @@
-import { starPulse } from "./animations/starPulse";
+import { starRain } from "./animations/starRain";
 import { LEDAnimation } from "./animations/types";
 
 export const cfg = {
@@ -10,5 +10,5 @@ export const cfg = {
   colors: {
     background: 0x000010,
   },
-  animation: starPulse as LEDAnimation,
+  animation: starRain as LEDAnimation,
 };
