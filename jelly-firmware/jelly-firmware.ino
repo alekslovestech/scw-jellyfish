@@ -11,7 +11,6 @@
 
 using StripBus = NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>;
 
-
 const int HX711_DOUT = 4;
 const int HX711_SCK  = 5;
 float calibration_factor = -14505;
@@ -19,53 +18,28 @@ float calibration_factor = -14505;
 constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
 constexpr uint16_t NUM_STRIPS = 16;
 
-constexpr uint8_t PIN0  = 4;
-constexpr uint8_t PIN1  = 5;
-constexpr uint8_t PIN2  = 6;
-constexpr uint8_t PIN3  = 7;
-constexpr uint8_t PIN4  = 8;
-constexpr uint8_t PIN5  = 9;
-constexpr uint8_t PIN6  = 10;
-constexpr uint8_t PIN7  = 11;
-constexpr uint8_t PIN8  = 12;
-constexpr uint8_t PIN9  = 13;
-constexpr uint8_t PIN10 = 14;
-constexpr uint8_t PIN11 = 15;
-constexpr uint8_t PIN12 = 16;
-constexpr uint8_t PIN13 = 17;
-constexpr uint8_t PIN14 = 18;
-constexpr uint8_t PIN15 = 21;
 
-StripBus strip0(NUM_LEDS_PER_STRIP, PIN0);
-StripBus strip1(NUM_LEDS_PER_STRIP, PIN1);
-StripBus strip2(NUM_LEDS_PER_STRIP, PIN2);
-StripBus strip3(NUM_LEDS_PER_STRIP, PIN3);
-StripBus strip4(NUM_LEDS_PER_STRIP, PIN4);
-StripBus strip5(NUM_LEDS_PER_STRIP, PIN5);
-StripBus strip6(NUM_LEDS_PER_STRIP, PIN6);
-StripBus strip7(NUM_LEDS_PER_STRIP, PIN7);
-StripBus strip8(NUM_LEDS_PER_STRIP, PIN8);
-StripBus strip9(NUM_LEDS_PER_STRIP, PIN9);
-StripBus strip10(NUM_LEDS_PER_STRIP, PIN10);
-StripBus strip11(NUM_LEDS_PER_STRIP, PIN11);
-StripBus strip12(NUM_LEDS_PER_STRIP, PIN12);
-StripBus strip13(NUM_LEDS_PER_STRIP, PIN13);
-StripBus strip14(NUM_LEDS_PER_STRIP, PIN14);
-StripBus strip15(NUM_LEDS_PER_STRIP, PIN15);
-
-std::array<StripBus*, NUM_STRIPS> strips = {
-  &strip0, &strip1, &strip2, &strip3,
-  &strip4, &strip5, &strip6, &strip7,
-  &strip8, &strip9, &strip10, &strip11,
-  &strip12, &strip13, &strip14, &strip15
+int PINS[NUM_STRIPS] = {
+  4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,21
+}; // consider skipping pin 8
+StripBus strips[] = {
+  {NUM_LEDS_PER_STRIP, PINS[0]},
+  {NUM_LEDS_PER_STRIP, PINS[1]},
+  {NUM_LEDS_PER_STRIP, PINS[2]},
+  {NUM_LEDS_PER_STRIP, PINS[3]},
+  {NUM_LEDS_PER_STRIP, PINS[4]},
+  {NUM_LEDS_PER_STRIP, PINS[5]},
+  {NUM_LEDS_PER_STRIP, PINS[6]},
+  {NUM_LEDS_PER_STRIP, PINS[7]},
+  {NUM_LEDS_PER_STRIP, PINS[8]},
+  {NUM_LEDS_PER_STRIP, PINS[9]},
+  {NUM_LEDS_PER_STRIP, PINS[10]},
+  {NUM_LEDS_PER_STRIP, PINS[11]},
+  {NUM_LEDS_PER_STRIP, PINS[12]},
+  {NUM_LEDS_PER_STRIP, PINS[13]},
+  {NUM_LEDS_PER_STRIP, PINS[14]},
+  {NUM_LEDS_PER_STRIP, PINS[15]},
 };
-
-template <typename Fn>
-void forEachStrip(Fn&& fn) {
-  for (auto* strip : strips) {
-    fn(*strip);
-  }
-}
 
 WebServer server(80);
 Preferences prefs;
@@ -145,10 +119,10 @@ void setup() {
 
   loadIdentity();
 
-  forEachStrip([](StripBus& strip) {
-    strip.Begin();
-    strip.Show();   // optional, but often useful to start with LEDs off
-  });
+  for (int i=0; i<NUM_STRIPS; i++) {
+    strips[i].Begin();
+    strips[i].Show();
+  } 
 
   connectToAnyWiFi();
   lastWiFiAttempt = millis();
@@ -174,7 +148,6 @@ void loop() {
   }
 
   ensureWiFi();
-
 
   if (identifyRequested) {
     identifyRequested = false;
