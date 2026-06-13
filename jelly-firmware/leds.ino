@@ -47,6 +47,11 @@ void drawFrame() {
   //_measurement += read;
   //Serial.println(read); 
   //Serial.println(_measurement);
+  showColorWheelAcrossEightStrips();
+  _ledFrame++;
+}
+
+void demo() {
   fillStrip(strip0, RgbColor(255, 0, 0));     // red
   fillStrip(strip1, RgbColor(0, 255, 0));     // green
   fillStrip(strip2, RgbColor(0, 0, 255));     // blue
@@ -64,10 +69,9 @@ void drawFrame() {
   strip5.Show();
   strip6.Show();
   strip7.Show();
-  _ledFrame++;
 }
 
-void fillStrip(NeoPixelBus<NeoGrbFeature, NeoEsp32LcdX8Ws2812xMethod>& strip, RgbColor c)
+void fillStrip(NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>& strip, RgbColor c)
 {
   for (uint16_t i = 0; i < NUM_LEDS_PER_STRIP; i++) {
     strip.SetPixelColor(i, c);
@@ -78,6 +82,33 @@ void ledsTick() {
   if (millis() - _lastLedTime > 30) {
     _lastLedTime = millis();
     drawFrame();
+  }
+}
+
+void showColorWheelAcrossEightStrips()
+{
+  constexpr uint8_t WHEEL_STRIPS = 8;
+
+  // Slow global drift of the whole wheel
+  uint8_t globalShift = millis() / 20;   // smaller = slower, larger = faster
+
+  for (uint8_t s = 0; s < WHEEL_STRIPS; ++s) {
+    StripBus& strip = *strips[s];
+
+    // Evenly space the strips around the color wheel
+    uint8_t stripOffset = (uint8_t)((s * 256) / WHEEL_STRIPS);
+
+    for (uint16_t i = 0; i < NUM_LEDS_PER_STRIP; ++i) {
+      // Spread each strip across the full wheel
+      uint8_t ledHue = (uint8_t)((i * 256) / NUM_LEDS_PER_STRIP);
+
+      // Combine strip offset + position + slow animation
+      uint8_t hue = ledHue + stripOffset + globalShift;
+
+      strip.SetPixelColor(i, Wheel(hue));
+    }
+
+    strip.Show();
   }
 }
 
@@ -96,5 +127,23 @@ void weightUpdate() {
     Serial.print(_agitation);
     Serial.print("   Calmness: ");
     Serial.println(_calmness);
+}
+
+// Helper: convert a hue wheel position (0-255) into RGB
+RgbColor Wheel(uint8_t pos)
+{
+  pos = 255 - pos;
+
+  if (pos < 85) {
+    return RgbColor(255 - pos * 3, 0, pos * 3);
+  }
+
+  if (pos < 170) {
+    pos -= 85;
+    return RgbColor(0, pos * 3, 255 - pos * 3);
+  }
+
+  pos -= 170;
+  return RgbColor(pos * 3, 255 - pos * 3, 0);
 }
 
