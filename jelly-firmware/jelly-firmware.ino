@@ -9,7 +9,7 @@
 #include "version.h"
 #include <array>
 
-using StripBus = NeoPixelBus<NeoGrbFeature, NeoEsp32LcdX8Ws2812xMethod>;
+using StripBus = NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>;
 
 
 const int HX711_DOUT = 4;
@@ -144,7 +144,7 @@ void setup() {
   delay(200);
 
   loadIdentity();
-  
+
   forEachStrip([](StripBus& strip) {
     strip.Begin();
     strip.Show();   // optional, but often useful to start with LEDs off
