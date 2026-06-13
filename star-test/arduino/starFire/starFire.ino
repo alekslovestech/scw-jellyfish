@@ -1,7 +1,7 @@
 #include <FastLED.h>
 
 #define NUM_LEDS   50
-#define DATA_PIN   4
+#define DATA_PIN   48
 #define BRIGHTNESS 150
 
 CRGB leds[NUM_LEDS];
@@ -14,6 +14,9 @@ float tipness(int i) {
   return (seg % 2 == 0) ? t : 1.0f - t;
 }
 
+CRGB fireColorBlue(float heat) {
+  return CRGB(0, 0, 255);
+}
 CRGB fireColor(float heat) {
   if (heat < 0.3f) {
     float f = heat / 0.3f;
@@ -42,7 +45,7 @@ void loop() {
   float cycle = 0.5f + 0.5f * sin(time * 1.4f);  // slow breath
 
   for (int i = 0; i < NUM_LEDS; i++) {
-    float tip = tipness(i);
+  /*  float tip = tipness(i);
 
     // Three layered flicker waves (same weights as TS source)
     float flicker =
@@ -53,8 +56,8 @@ void loop() {
 
     float heat = tip * 0.55f + flickerNorm * 0.25f + cycle * 0.20f;
     heat = max(0.0f, min(1.0f, heat));
-
-    leds[i] = fireColor(heat);
+*/
+    leds[i] = CRGB::Red; //fireColorBlue(heat);
   }
 
   FastLED.show();
