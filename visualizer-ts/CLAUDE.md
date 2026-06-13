@@ -74,3 +74,14 @@ Pattern:
 After creating an animation file, add it to the `animations` map in `panel.ts` to make it selectable in the UI.
 
 See `ANIMATION_GUIDE.md` for detailed recipes (waves, cascades, per-segment colouring, direction tests).
+
+## Real LED hardware — color order
+
+The physical WS2811 strips use **BRG** byte order (confirmed by hardware test).
+
+```cpp
+FastLED.addLeds<WS2811, DATA_PIN, BRG>(leds, NUM_LEDS);
+```
+
+Mapping: `CRGB(255,0,0)` → Blue, `CRGB(0,255,0)` → Red, `CRGB(0,0,255)` → Green.
+Every Arduino sketch targeting this hardware must use `BRG` — any other order produces wrong colors.
