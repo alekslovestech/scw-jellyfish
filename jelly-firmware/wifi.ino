@@ -12,8 +12,8 @@ WifiCredential wifiList[] = {
 };
 
 const int WIFI_COUNT = sizeof(wifiList) / sizeof(wifiList[0]);
-const unsigned long WIFI_CONNECT_TIMEOUT_MS = 8000;
-const unsigned long WIFI_RETRY_INTERVAL_MS  = 30000;
+const unsigned long WIFI_CONNECT_TIMEOUT_MS = 3000;
+const unsigned long WIFI_RETRY_INTERVAL_MS  = 300000;
 
 String currentSSID = "";
 
@@ -63,7 +63,9 @@ void ensureWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
   if (millis() - lastWiFiAttempt < WIFI_RETRY_INTERVAL_MS) return;
   lastWiFiAttempt = millis();
+
   connectToAnyWiFi();
+
 }
 
 void startMDNSIfNeeded() {
