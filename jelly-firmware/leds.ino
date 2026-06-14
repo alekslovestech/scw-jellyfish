@@ -49,8 +49,7 @@ void demo() {
   }  
 }
 
-void fillStrip(NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>& strip, RgbColor c)
-{
+void fillStrip(StripBus& strip, RgbColor c) {
   for (uint16_t i = 0; i < NUM_LEDS_PER_STRIP; i++) {
     strip.SetPixelColor(i, c);
   }

@@ -39,7 +39,6 @@ bool tryConnectSingleWiFi(const char* ssid, const char* password) {
     }
     delay(250);
   }
-
   Serial.print("Failed: "); Serial.println(ssid);
   return false;
 }
@@ -63,9 +62,7 @@ void ensureWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
   if (millis() - lastWiFiAttempt < WIFI_RETRY_INTERVAL_MS) return;
   lastWiFiAttempt = millis();
-
   connectToAnyWiFi();
-
 }
 
 void startMDNSIfNeeded() {
@@ -78,7 +75,10 @@ void startMDNSIfNeeded() {
   }
 }
 
-// ── Web server + OTA ──────────────────────────────────────────────────────────
+// ── Web server + OTA (UI + portal logic to move into TypeScript) ───────────────
+
+// TODO: the page generation, HTML UI and web portal behavior should be moved out
+// to a TypeScript-based portal. Keep the ESP endpoints here for now.
 
 String htmlEscape(const String& in) {
   String out = in;
