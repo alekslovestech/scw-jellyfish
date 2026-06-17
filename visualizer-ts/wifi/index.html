@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP32 OTA Control</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #f5f7fb;
+        color: #111;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .page {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        margin-bottom: 16px;
+        font-size: clamp(2rem, 2.5vw, 2.6rem);
+      }
+
+      .card {
+        background: white;
+        border: 1px solid #d8e2ef;
+        border-radius: 16px;
+        padding: 20px;
+        margin: 18px 0;
+        box-shadow: 0 10px 30px rgba(15, 32, 63, 0.06);
+      }
+
+      .card h2 {
+        margin-bottom: 12px;
+        font-size: 1.25rem;
+      }
+
+      p {
+        line-height: 1.7;
+      }
+
+      code {
+        background: #eef4ff;
+        color: #1155cc;
+        padding: 3px 6px;
+        border-radius: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+
+      .muted {
+        color: #505f79;
+      }
+
+      .msg {
+        background: #eef4ff;
+        border: 1px solid #c6dcff;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        color: #102a43;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      input[type="text"], input[type="file"] {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+        font-size: 1rem;
+      }
+
+      button, input[type="submit"] {
+        border: none;
+        border-radius: 10px;
+        background: #316bff;
+        color: white;
+        padding: 12px 18px;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      button:disabled,
+      input[type="submit"]:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .info-row {
+        display: grid;
+        grid-template-columns: minmax(140px, 190px) 1fr;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .info-row b {
+        color: #1e293b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>ESP32 OTA Control</h1>
+      <div id="message-container"></div>
+
+      <div class="card">
+        <h2>Device address</h2>
+        <p class="muted">Enter the device URL or hostname for the chip you want to manage.</p>
+        <label for="device-host-input">Device host</label>
+        <input id="device-host-input" type="text" placeholder="http://device.local or http://192.168.1.42" />
+        <button id="refresh-status-button">Refresh status</button>
+      </div>
+
+      <div class="card" id="device-info-card">
+        <h2>Device info</h2>
+        <div class="info-row"><b>Name:</b><span id="device-name">...</span></div>
+        <div class="info-row"><b>Firmware:</b><span id="firmware-version">...</span></div>
+        <div class="info-row"><b>Chip ID:</b><span id="chip-id">...</span></div>
+        <div class="info-row"><b>MAC:</b><span id="mac-address">...</span></div>
+        <div class="info-row"><b>Wi-Fi:</b><span id="wifi-status">...</span></div>
+        <div class="info-row"><b>Hostname:</b><span id="hostname">...</span></div>
+      </div>
+
+      <div class="card">
+        <h2>Identify this device</h2>
+        <p>Send a request to blink the LEDs so you can identify the device on the network.</p>
+        <button id="identify-button">Blink LEDs</button>
+      </div>
+
+      <div class="card">
+        <h2>Rename device</h2>
+        <p>Update the device name and reboot it remotely.</p>
+        <form id="rename-form">
+          <label for="device-name-input">Device name</label>
+          <input id="device-name-input" name="name" type="text" placeholder="New device name" />
+          <input type="submit" value="Save name and reboot" />
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Firmware update</h2>
+        <p class="muted">Upload the compiled <code>.bin</code> file to the device for OTA installation.</p>
+        <form id="update-form" enctype="multipart/form-data">
+          <label for="firmware-file">Firmware file</label>
+          <input id="firmware-file" name="update" type="file" accept=".bin" />
+          <input type="submit" value="Install update" />
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Note</h2>
+        <p class="muted">This page is a TypeScript-hosted portal equivalent to the firmware UI. The device-side C++ should keep only the minimal REST endpoints required to support these actions.</p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/wifi.ts"></script>
+  </body>
+</html>

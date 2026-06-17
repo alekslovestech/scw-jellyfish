@@ -8,10 +8,9 @@ struct WifiCredential {
 WifiCredential wifiList[] = {
   {"Nanonet2",              "Sgrunterundt"   },
   {"TP-Link_2.4GHz_9EC673", ""               },
-  {"Airties_Air4960R_CK74", "kptfyk9397"     },
+  {"Airties_Air4960R_CK74", "kptfyk9397"     },  
 };
 
-const int WIFI_COUNT = sizeof(wifiList) / sizeof(wifiList[0]);
 const unsigned long WIFI_CONNECT_TIMEOUT_MS = 3000;
 const unsigned long WIFI_RETRY_INTERVAL_MS  = 300000;
 
@@ -19,42 +18,37 @@ String currentSSID = "";
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
-bool tryConnectSingleWiFi(const char* ssid, const char* password) {
+// Only the preferred network (wifiList[0]) is ever tried — reorder the list
+// above to change which one that is.
+bool connectPreferredWiFi() {
+  const WifiCredential& net = wifiList[0];
   Serial.print("Trying Wi-Fi: ");
-  Serial.println(ssid);
+  Serial.println(net.ssid);
 
   WiFi.disconnect(true, true);
   delay(100);
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(deviceName.c_str());
-  WiFi.begin(ssid, password);
+  WiFi.begin(net.ssid, net.password);
 
   unsigned long start = millis();
   while (millis() - start < WIFI_CONNECT_TIMEOUT_MS) {
     if (WiFi.status() == WL_CONNECTED) {
-      currentSSID = ssid;
-      Serial.print("Connected to "); Serial.println(ssid);
+      currentSSID = net.ssid;
+      Serial.print("Connected to "); Serial.println(net.ssid);
       Serial.print("IP: ");          Serial.println(WiFi.localIP());
-      return true;
-    }
-    delay(250);
-  }
-  Serial.print("Failed: "); Serial.println(ssid);
-  return false;
-}
-
-bool connectToAnyWiFi() {
-  for (int n = 0; n < WIFI_COUNT; n++) {
-    if (tryConnectSingleWiFi(wifiList[n].ssid, wifiList[n].password)) {
       startMDNSIfNeeded();
       setupWebServer();
       return true;
     }
+    delay(250);
   }
+
   currentSSID = "";
+  Serial.print("Failed: "); Serial.println(net.ssid);
   WiFi.disconnect(true, true);
   WiFi.mode(WIFI_OFF);
-  Serial.println("No Wi-Fi networks available, continuing offline.");
+  Serial.println("No Wi-Fi, continuing offline.");
   return false;
 }
 
@@ -62,7 +56,7 @@ void ensureWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
   if (millis() - lastWiFiAttempt < WIFI_RETRY_INTERVAL_MS) return;
   lastWiFiAttempt = millis();
-  connectToAnyWiFi();
+  connectPreferredWiFi();
 }
 
 void startMDNSIfNeeded() {
@@ -75,18 +69,21 @@ void startMDNSIfNeeded() {
   }
 }
 
-// ── Web server + OTA (UI + portal logic to move into TypeScript) ───────────────
+// ── Web server + OTA (REST API for the TypeScript portal) ──────────────────────
 
-// TODO: the page generation, HTML UI and web portal behavior should be moved out
-// to a TypeScript-based portal. Keep the ESP endpoints here for now.
+// The HTML UI and portal logic now live in visualizer-ts (served at /wifi). The
+// device only exposes the JSON/OTA REST endpoints below, with permissive CORS so
+// the browser-hosted portal can call them cross-origin.
 
-String htmlEscape(const String& in) {
-  String out = in;
-  out.replace("&", "&amp;");
-  out.replace("<", "&lt;");
-  out.replace(">", "&gt;");
-  out.replace("\"", "&quot;");
-  return out;
+void addCorsHeaders() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+void handleOptions() {
+  addCorsHeaders();
+  server.send(200, "text/plain", "");
 }
 
 String wifiStatusText() {
@@ -95,85 +92,55 @@ String wifiStatusText() {
   return "Not connected";
 }
 
-String buildHtmlPage(const String& message = "") {
-  String html;
-  html += "<!doctype html><html><head><meta charset='utf-8'>";
-  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-  html += "<title>ESP32 OTA</title>";
-  html += "<style>";
-  html += "body{font-family:Arial,sans-serif;max-width:760px;margin:24px auto;padding:0 16px;line-height:1.5;}";
-  html += "h1,h2{margin-bottom:8px;}";
-  html += ".card{border:1px solid #ccc;border-radius:12px;padding:16px;margin:16px 0;}";
-  html += "input[type=text],input[type=file]{width:100%;padding:10px;margin:8px 0;}";
-  html += "input[type=submit],button{padding:10px 16px;font-size:16px;cursor:pointer;}";
-  html += ".muted{color:#555;}";
-  html += ".msg{padding:10px;border-radius:8px;background:#f2f2f2;margin:12px 0;}";
-  html += "code{background:#f7f7f7;padding:2px 6px;border-radius:6px;}";
-  html += "</style></head><body>";
+void handleStatus() {
+  addCorsHeaders();
 
-  html += "<h1>ESP32-S3 OTA Control</h1>";
+  String hostname = deviceName + ".local";
+  String response = "{";
+  response += "\"deviceName\":\"" + deviceName + "\",";
+  response += "\"firmwareVersion\":\"" FW_VERSION "\",";
+  response += "\"chipId\":\"" + chipIdHex + "\",";
+  response += "\"macAddress\":\"" + getMacAddressString() + "\",";
+  response += "\"wifiStatus\":\"" + wifiStatusText() + "\",";
+  response += "\"hostname\":\"" + hostname + "\"";
+  response += "}";
 
-  if (message.length() > 0)
-    html += "<div class='msg'>" + htmlEscape(message) + "</div>";
-
-  html += "<div class='card'><h2>Device info</h2>";
-  html += "<p><b>Name:</b> "     + htmlEscape(deviceName) + "</p>";
-  html += "<p><b>Firmware:</b> " FW_VERSION "</p>";
-  html += "<p><b>Chip ID:</b> "  + chipIdHex + "</p>";
-  html += "<p><b>MAC:</b> "      + getMacAddressString() + "</p>";
-  html += "<p><b>Wi-Fi:</b> "    + htmlEscape(wifiStatusText()) + "</p>";
-  if (WiFi.status() == WL_CONNECTED)
-    html += "<p><b>Hostname:</b> <code>" + htmlEscape(deviceName) + ".local</code></p>";
-  html += "</div>";
-
-  html += "<div class='card'><h2>Identify this device</h2>";
-  html += "<form method='POST' action='/identify'>";
-  html += "<input type='submit' value='Blink LEDs'></form></div>";
-
-  html += "<div class='card'><h2>Rename device</h2>";
-  html += "<form method='POST' action='/rename'>";
-  html += "<input type='text' name='name' value='" + htmlEscape(deviceName) + "'>";
-  html += "<input type='submit' value='Save name and reboot'></form></div>";
-
-  html += "<div class='card'><h2>Firmware update</h2>";
-  html += "<p class='muted'>Upload the compiled <code>.bin</code> file from Arduino IDE.</p>";
-  html += "<form method='POST' action='/update' enctype='multipart/form-data'>";
-  html += "<input type='file' name='update'>";
-  html += "<input type='submit' value='Install update'></form></div>";
-
-  html += "</body></html>";
-  return html;
+  server.send(200, "application/json", response);
 }
 
-void handleRoot()   { server.send(200, "text/html", buildHtmlPage()); }
-
 void handleRename() {
+  addCorsHeaders();
   if (!server.hasArg("name")) {
-    server.send(400, "text/plain", "Missing 'name' field");
+    server.send(400, "application/json", "{\"error\":\"Missing 'name' field\"}");
     return;
   }
   String cleaned = sanitizeDeviceName(server.arg("name"));
   saveDeviceName(cleaned);
-  server.send(200, "text/html", buildHtmlPage("Saved device name as '" + cleaned + "'. Rebooting..."));
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Saved device name. Rebooting...\"}");
   delay(1000);
   ESP.restart();
 }
 
 void handleIdentify() {
+  addCorsHeaders();
   identifyRequested = true;
-  server.send(200, "text/html", buildHtmlPage("Identify sequence requested."));
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Identify sequence requested.\"}");
 }
 
 void setupWebServer() {
   if (webServerStarted) return;
 
-  server.on("/",        HTTP_GET,  handleRoot);
-  server.on("/rename",  HTTP_POST, handleRename);
-  server.on("/identify",HTTP_POST, handleIdentify);
+  server.on("/wifi/status", HTTP_GET, handleStatus);
+  server.on("/wifi/status", HTTP_OPTIONS, handleOptions);
+  server.on("/wifi/rename", HTTP_POST, handleRename);
+  server.on("/wifi/rename", HTTP_OPTIONS, handleOptions);
+  server.on("/wifi/identify", HTTP_POST, handleIdentify);
+  server.on("/wifi/identify", HTTP_OPTIONS, handleOptions);
 
-  server.on("/update", HTTP_POST, []() {
+  server.on("/wifi/update", HTTP_POST, []() {
+    addCorsHeaders();
     bool ok = !Update.hasError();
-    server.send(200, "text/html", buildHtmlPage(ok ? "Update successful. Rebooting..." : "Update failed."));
+    server.send(200, "application/json", ok ? "{\"status\":\"ok\",\"message\":\"Update successful. Rebooting...\"}" : "{\"status\":\"error\",\"message\":\"Update failed.\"}");
     delay(1000);
     if (ok) ESP.restart();
   }, []() {
@@ -192,6 +159,7 @@ void setupWebServer() {
       Serial.println("Update aborted");
     }
   });
+  server.on("/wifi/update", HTTP_OPTIONS, handleOptions);
 
   server.begin();
   webServerStarted = true;

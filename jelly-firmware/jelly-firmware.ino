@@ -124,7 +124,7 @@ void setup() {
     strips[i].Show();
   } 
 
-  connectToAnyWiFi();
+  connectPreferredWiFi();
   lastWiFiAttempt = millis();
 
   Serial.println("Boot complete");
