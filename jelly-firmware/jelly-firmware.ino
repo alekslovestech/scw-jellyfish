@@ -16,11 +16,24 @@ const int HX711_SCK  = 5;
 float calibration_factor = -14505;
 
 constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
-constexpr uint16_t NUM_STRIPS = 16;
+constexpr uint16_t NUM_STRIPS = 14;
+
+struct Pos2D {
+  float x;
+  float y;
+};
+
+struct Pos3D {
+  float x;
+  float y;
+  float z;
+};
+
+struct Pos3D ledPos[8][NUM_LEDS_PER_STRIP];
 
 
 int PINS[NUM_STRIPS] = {
-  4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,21
+  4,5,6,7,8,9,12,13,14,15,16,17,18,21
 }; // consider skipping pin 8
 StripBus strips[] = {
   {NUM_LEDS_PER_STRIP, PINS[0]},
@@ -37,8 +50,8 @@ StripBus strips[] = {
   {NUM_LEDS_PER_STRIP, PINS[11]},
   {NUM_LEDS_PER_STRIP, PINS[12]},
   {NUM_LEDS_PER_STRIP, PINS[13]},
-  {NUM_LEDS_PER_STRIP, PINS[14]},
-  {NUM_LEDS_PER_STRIP, PINS[15]},
+ // {NUM_LEDS_PER_STRIP, PINS[14]},
+ // {NUM_LEDS_PER_STRIP, PINS[15]},
 };
 
 WebServer server(80);
@@ -140,6 +153,13 @@ void setup() {
     Serial.println("Running offline; LEDs active, Wi-Fi will retry later.");
   }
 
+  Serial.println("Calculating LED positions");
+  for (int s = 0; s < 8; s++) {
+    for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
+        ledPos[s][p] = smallJellyFind3Dpos(p, s);
+    }
+  }
+
 }
 
 void loop() {
@@ -153,6 +173,5 @@ void loop() {
     identifyRequested = false;
     runIdentifySequence();
   }
-
   ledsTick();
 }

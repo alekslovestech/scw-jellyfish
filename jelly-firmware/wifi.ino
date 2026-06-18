@@ -12,8 +12,8 @@ WifiCredential wifiList[] = {
 };
 
 const int WIFI_COUNT = sizeof(wifiList) / sizeof(wifiList[0]);
-const unsigned long WIFI_CONNECT_TIMEOUT_MS = 3000;
-const unsigned long WIFI_RETRY_INTERVAL_MS  = 300000;
+const unsigned long WIFI_CONNECT_TIMEOUT_MS = 5000;
+const unsigned long WIFI_RETRY_INTERVAL_MS  = 60000;
 
 String currentSSID = "";
 
