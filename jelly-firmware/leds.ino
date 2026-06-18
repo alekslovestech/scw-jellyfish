@@ -36,7 +36,7 @@ void drawFrame() {
   start.y = 0.0f;
   start.z = 0.2f;
   */
-  if (_ledFrame%900==0) {
+  /*if (_ledFrame%900==0) {
     point.x = random(-200,200)/100.0f;
     point.y = random(-200,50)/100.0f;
     point.z = random(-200,200)/100.0f;
@@ -51,10 +51,14 @@ void drawFrame() {
     point3.y = random(-200,50)/100.0f;
     point3.z = random(-200,200)/100.0f;
   }*/
-  rippleOutFromPoint(point, _ledFrame%900);
+  //rippleOutFromPoint(point, _ledFrame%900);
   //rippleOutFromPoint(point2, (_ledFrame+300)%900);
   //rippleOutFromPoint(point3, (_ledFrame+600)%900);
-  showLEDs();
+  //showLEDs();
+  if (scale.is_ready()) {
+    _weight = scale.get_units(1);  
+    weightUpdate();
+  }
   _ledFrame++;
 }
 
@@ -168,20 +172,20 @@ void showLEDs() {
 
 // For load cells
 void weightUpdate() {
-    _agitation += abs(_weight - _lastWeight) + 0.01;
-    _lastWeight = _weight;
-    _agitation *= 0.99;
-    if (_calmness > 1000/_agitation) {
-        _calmness = 0.95*_calmness + 50/_agitation;
-    } else {
-        _calmness = 0.999*_calmness + 1/_agitation;
-    }
-    Serial.print("Weight: ");
-    Serial.print(_weight);
-    Serial.print("   Agitation: ");
-    Serial.print(_agitation);
-    Serial.print("   Calmness: ");
-    Serial.println(_calmness);
+  _agitation += abs(_weight - _lastWeight) + 0.01;
+  _lastWeight = _weight;
+  _agitation *= 0.99;
+  if (_calmness > 1000/_agitation) {
+      _calmness = 0.95*_calmness + 50/_agitation;
+  } else {
+      _calmness = 0.999*_calmness + 1/_agitation;
+  }
+  Serial.print("Weight: ");
+  Serial.print(_weight);
+  Serial.print("   Agitation: ");
+  Serial.print(_agitation);
+  Serial.print("   Calmness: ");
+  Serial.println(_calmness);
 }
 
 // Helper: convert a hue wheel position (0-255) into RGB

@@ -6,14 +6,14 @@ struct WifiCredential {
 };
 
 WifiCredential wifiList[] = {
-  {"Nanonet2",              "Sgrunterundt"   },
-  {"TP-Link_2.4GHz_9EC673", ""               },
-  {"Airties_Air4960R_CK74", "kptfyk9397"     },
+ // {"Nanonet2",              "Sgrunterundt"   },
+  {"SCW", "Jellyfish"               },
+ // {"Airties_Air4960R_CK74", "kptfyk9397"     },
 };
 
 const int WIFI_COUNT = sizeof(wifiList) / sizeof(wifiList[0]);
 const unsigned long WIFI_CONNECT_TIMEOUT_MS = 5000;
-const unsigned long WIFI_RETRY_INTERVAL_MS  = 60000;
+const unsigned long WIFI_RETRY_INTERVAL_MS  = 10000;
 
 String currentSSID = "";
 

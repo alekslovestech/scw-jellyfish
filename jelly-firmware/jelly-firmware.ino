@@ -8,11 +8,14 @@
 #include <Arduino.h>
 #include "version.h"
 #include <array>
+#include "HX711.h"
+
 
 using StripBus = NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>;
 
-const int HX711_DOUT = 4;
-const int HX711_SCK  = 5;
+HX711 scale;
+const int HX711_DOUT = 11;
+const int HX711_SCK  = 10;
 float calibration_factor = -14505;
 
 constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
@@ -152,6 +155,12 @@ void setup() {
   } else {
     Serial.println("Running offline; LEDs active, Wi-Fi will retry later.");
   }
+
+
+  scale.begin(HX711_DOUT, HX711_SCK);
+  scale.set_scale(calibration_factor);
+  scale.tare();  // zero the scale
+
 
   Serial.println("Calculating LED positions");
   for (int s = 0; s < 8; s++) {
