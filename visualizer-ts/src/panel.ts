@@ -2,8 +2,8 @@ import { Pane } from "tweakpane";
 import { cfg } from "./config";
 import { colorCycle } from "./animations/colorCycle";
 import {individualColorCycle } from "./animations/individualColorCycle"
-import { magicDust } from "./animations/magicDust";
 import { fallingRain } from "./animations/fallingRain";
+import { sparkleDust } from "./animations/sparkleDust";
 import {decoupleInnerTentacles} from "./animations/decoupleInnerTentacles"
 import { waveCascade } from "./animations/waveCascade"
 import{movementSimulation} from "./animations/movementSimulation"
@@ -22,7 +22,7 @@ const animations = {
   fireExplosion,
   fireSpread,
   individualColorCycle,
-  magicDust,
+  sparkleDust,
   fallingRain,
   waterfall,
   decoupleInnerTentacles,
