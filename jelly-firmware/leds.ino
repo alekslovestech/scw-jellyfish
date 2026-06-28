@@ -20,26 +20,24 @@ void ledsTick() {
     _lastLedTime = millis();
     drawFrame();
   }
-  //Serial.println("Ticking, time elapsed: ");
-  //Serial.print(millis()- _lastLedTime);
+  //logPrintln("Ticking, time elapsed: ");
+  //logPrint(millis()- _lastLedTime);
 }
 
 void drawFrame() {
-  //_measurement -= _measurement/10;
-  //int read = analogRead(PIN_SENSOR);
-  //_measurement += read;
-  //Serial.println(read); 
-  //Serial.println(_measurement);
   //bottomFill();
   /*struct Pos3D start;
   start.x = -1.0f;
   start.y = 0.0f;
   start.z = 0.2f;
   */
-  /*if (_ledFrame%900==0) {
-    point.x = random(-200,200)/100.0f;
-    point.y = random(-200,50)/100.0f;
-    point.z = random(-200,200)/100.0f;
+  if (isJelly) {
+    if (_ledFrame%900==0) {
+      point.x = random(-200,200)/100.0f;
+      point.y = random(-200,50)/100.0f;
+      point.z = random(-200,200)/100.0f;
+    }
+    rippleOutFromPoint(point, _ledFrame%900);
   }
   /*if (_ledFrame%900==300) {
     point2.x = random(-200,200)/100.0f;
@@ -51,14 +49,16 @@ void drawFrame() {
     point3.y = random(-200,50)/100.0f;
     point3.z = random(-200,200)/100.0f;
   }*/
-  //rippleOutFromPoint(point, _ledFrame%900);
+
   //rippleOutFromPoint(point2, (_ledFrame+300)%900);
   //rippleOutFromPoint(point3, (_ledFrame+600)%900);
-  //showLEDs();
-  if (scale.is_ready()) {
+  showLEDs();
+  if (hasScale && scale.is_ready()) {
     _weight = scale.get_units(1);  
     weightUpdate();
+    sendNumberToPeer("receiver.local", _agitation);
   }
+  if (deviceName == "receiver") sensorDemo();
   _ledFrame++;
 }
 
@@ -79,6 +79,17 @@ void runIdentifySequence() {
 }
 
 // High level patters:
+void sensorDemo() {
+  for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
+    for (int s = 0; s<8 ; s++) {
+      if (p < _agitation) strips[s].SetPixelColor(p, wheel(_ledFrame%256));
+      else strips[s].SetPixelColor(p, RgbColor(0,0,0));
+    }
+  }
+  for (int s = 0; s < NUM_STRIPS; s++) {
+    strips[s].Show();
+  };
+}
 
 void rippleOutFromPoint(struct Pos3D startPoint, int frame) {
   float distanceSQ;
@@ -128,7 +139,7 @@ void demo() {
 void rotate()
 {
   for (int s = 0; s<8; s++) {
-    fillStrip(strips[s], Wheel(16*s+_ledFrame));
+    fillStrip(strips[s], wheel(16*s+_ledFrame));
     strips[s].Show();
   }
 }
@@ -155,7 +166,7 @@ void showColorWheelAcrossEightStrips()
       // Combine strip offset + position + slow animation
       uint8_t hue = ledHue + stripOffset + globalShift;
 
-      strip.SetPixelColor(i, Wheel(hue));
+      strip.SetPixelColor(i, wheel(hue));
     }
 
     strip.Show();
@@ -180,16 +191,16 @@ void weightUpdate() {
   } else {
       _calmness = 0.999*_calmness + 1/_agitation;
   }
-  Serial.print("Weight: ");
-  Serial.print(_weight);
-  Serial.print("   Agitation: ");
-  Serial.print(_agitation);
-  Serial.print("   Calmness: ");
-  Serial.println(_calmness);
+  logPrint("Weight: ");
+  logPrint(_weight);
+  logPrint("   Agitation: ");
+  logPrint(_agitation);
+  logPrint("   Calmness: ");
+  logPrintln(_calmness);
 }
 
 // Helper: convert a hue wheel position (0-255) into RGB
-RgbColor Wheel(uint8_t pos)
+RgbColor wheel(uint8_t pos)
 {
   pos = pos%256;
   pos = 255 - pos;

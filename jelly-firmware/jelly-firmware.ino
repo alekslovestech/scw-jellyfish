@@ -16,7 +16,9 @@ using StripBus = NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>;
 HX711 scale;
 const int HX711_DOUT = 11;
 const int HX711_SCK  = 10;
-float calibration_factor = -14505;
+float calibration_factor = -14850;
+bool hasScale = false;
+bool isJelly = true;
 
 constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
 constexpr uint16_t NUM_STRIPS = 14;
@@ -143,26 +145,27 @@ void setup() {
   connectToAnyWiFi();
   lastWiFiAttempt = millis();
 
-  Serial.println("Boot complete");
-  Serial.print("Running firmware ");
-  Serial.println(FW_VERSION);
+  logPrintln("Boot complete");
+  logPrint("Running firmware ");
+  logPrintln(FW_VERSION);
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("Open: http://");
-    Serial.println(WiFi.localIP());
-    Serial.print("Or:   http://");
-    Serial.print(deviceName);
-    Serial.println(".local");
+    logPrint("Open: http://");
+    logPrintln(WiFi.localIP());
+    logPrint("Or:   http://");
+    logPrint(deviceName);
+    logPrintln(".local");
   } else {
-    Serial.println("Running offline; LEDs active, Wi-Fi will retry later.");
+    logPrintln("Running offline; LEDs active, Wi-Fi will retry later.");
+  }
+  if (deviceName.indexOf("jelly") >= 0) isJelly = true;
+  //if (deviceName == "sender") hasScale = true;
+  if (hasScale) {
+    scale.begin(HX711_DOUT, HX711_SCK);
+    scale.set_scale(calibration_factor);
+    scale.tare();  // zero the scale
   }
 
-
-  scale.begin(HX711_DOUT, HX711_SCK);
-  scale.set_scale(calibration_factor);
-  scale.tare();  // zero the scale
-
-
-  Serial.println("Calculating LED positions");
+  logPrintln("Calculating LED positions");
   for (int s = 0; s < 8; s++) {
     for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
         ledPos[s][p] = smallJellyFind3Dpos(p, s);
@@ -183,4 +186,6 @@ void loop() {
     runIdentifySequence();
   }
   ledsTick();
+  //logPrintln(scale.get_units(1)); 
+  //logPrintf("RSSI: %d dBm\n", WiFi.RSSI());
 }

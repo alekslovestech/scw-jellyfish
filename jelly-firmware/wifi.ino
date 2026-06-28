@@ -1,3 +1,9 @@
+#include <HTTPClient.h>
+#include <esp_wifi.h>
+
+
+String lastSendStatus = "Ready";
+bool hasReceivedNumber = false;
 // ── Credentials ───────────────────────────────────────────────────────────────
 
 struct WifiCredential {
@@ -13,15 +19,15 @@ WifiCredential wifiList[] = {
 
 const int WIFI_COUNT = sizeof(wifiList) / sizeof(wifiList[0]);
 const unsigned long WIFI_CONNECT_TIMEOUT_MS = 5000;
-const unsigned long WIFI_RETRY_INTERVAL_MS  = 10000;
+const unsigned long WIFI_RETRY_INTERVAL_MS  = 1000000;
 
 String currentSSID = "";
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
 bool tryConnectSingleWiFi(const char* ssid, const char* password) {
-  Serial.print("Trying Wi-Fi: ");
-  Serial.println(ssid);
+  logPrint("Trying Wi-Fi: ");
+  logPrintln(ssid);
 
   WiFi.disconnect(true, true);
   delay(100);
@@ -32,14 +38,15 @@ bool tryConnectSingleWiFi(const char* ssid, const char* password) {
   unsigned long start = millis();
   while (millis() - start < WIFI_CONNECT_TIMEOUT_MS) {
     if (WiFi.status() == WL_CONNECTED) {
+      esp_wifi_set_ps(WIFI_PS_NONE);
       currentSSID = ssid;
-      Serial.print("Connected to "); Serial.println(ssid);
-      Serial.print("IP: ");          Serial.println(WiFi.localIP());
+      logPrint("Connected to "); logPrintln(ssid);
+      logPrint("IP: ");          logPrintln(WiFi.localIP());
       return true;
     }
     delay(250);
   }
-  Serial.print("Failed: "); Serial.println(ssid);
+  logPrint("Failed: "); logPrintln(ssid);
   return false;
 }
 
@@ -54,7 +61,7 @@ bool connectToAnyWiFi() {
   currentSSID = "";
   WiFi.disconnect(true, true);
   WiFi.mode(WIFI_OFF);
-  Serial.println("No Wi-Fi networks available, continuing offline.");
+  logPrintln("No Wi-Fi networks available, continuing offline.");
   return false;
 }
 
@@ -69,9 +76,9 @@ void startMDNSIfNeeded() {
   if (WiFi.status() != WL_CONNECTED || mdnsStarted) return;
   if (MDNS.begin(deviceName.c_str())) {
     mdnsStarted = true;
-    Serial.printf("mDNS started: http://%s.local\n", deviceName.c_str());
+    logPrintf("mDNS started: http://%s.local\n", deviceName.c_str());
   } else {
-    Serial.println("mDNS failed to start");
+    logPrintln("mDNS failed to start");
   }
 }
 
@@ -94,6 +101,43 @@ String wifiStatusText() {
     return "Connected to " + currentSSID + " (" + WiFi.localIP().toString() + ")";
   return "Not connected";
 }
+
+
+// ── Send number to the other device ───────────────────────────────────────────
+bool sendNumberToPeer(const String& host, float value) {
+  if (WiFi.status() != WL_CONNECTED) {
+    lastSendStatus = "Wi-Fi not connected";
+    return false;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+
+  String url = "http://" + host + "/setNumber";
+  if (!http.begin(client, url)) {
+    lastSendStatus = "Failed to begin HTTP request";
+    return false;
+  }
+
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  String body = "value=" + String(value);
+
+  int code = http.POST(body);
+  String response = http.getString();
+  http.end();
+
+  //logPrintf("POST %s -> %d\n", url.c_str(), code);
+  //logPrintln(response);
+
+  if (code >= 200 && code < 300) {
+    lastSendStatus = "Sent " + String(value) + " to " + host;
+    return true;
+  } else {
+    lastSendStatus = "Send failed, HTTP " + String(code);
+    return false;
+  }
+}
+
 
 String buildHtmlPage(const String& message = "") {
   String html;
@@ -124,6 +168,25 @@ String buildHtmlPage(const String& message = "") {
   html += "<p><b>Wi-Fi:</b> "    + htmlEscape(wifiStatusText()) + "</p>";
   if (WiFi.status() == WL_CONNECTED)
     html += "<p><b>Hostname:</b> <code>" + htmlEscape(deviceName) + ".local</code></p>";
+  html += "</div>";
+
+  html += "<div class='card'><h2>Last received number</h2>";
+  html += "<p style='font-size:2rem;margin:0;'><b>";
+  html += hasReceivedNumber ? String(_agitation) : String("--");
+  html += "</b></p>";
+  html += "<p class='muted'>JSON endpoint: <code>/number</code></p>";
+  html += "</div>";
+
+  html += "<div class='card'><h2>Send a number</h2>";
+  html += "<form method='POST' action='/sendNumber'>";
+  html += "<label>Receiver host or IP</label>";
+  html += "<input type='text' name='target' value='receiver.local'>";
+  html += "<label>Number</label>";
+  html += "<input type='number' name='value' value='123'>";
+  html += "<input type='submit' value='Send'></form></div>";
+
+  html += "<div class='card'><h2>Last send status</h2>";
+  html += "<p>" + htmlEscape(lastSendStatus) + "</p>";
   html += "</div>";
 
   html += "<div class='card'><h2>Identify this device</h2>";
@@ -164,12 +227,50 @@ void handleIdentify() {
   server.send(200, "text/html", buildHtmlPage("Identify sequence requested."));
 }
 
+void handleSendNumber() {
+  if (!server.hasArg("target") || !server.hasArg("value")) {
+    server.send(400, "text/plain", "Missing 'target' or 'value' field");
+    return;
+  }
+
+  String target = server.arg("target");
+  long value = server.arg("value").toInt();
+
+  bool ok = sendNumberToPeer(target, value);
+  server.send(200, "text/html",
+              buildHtmlPage(ok ? ("Sent " + String(value) + " to " + target)
+                               : ("Failed to send " + String(value) + " to " + target)));
+}
+
+void handleSetNumber() {
+  if (!server.hasArg("value")) {
+    server.send(400, "text/plain", "Missing 'value' field");
+    return;
+  }
+
+  _agitation = server.arg("value").toFloat();
+  hasReceivedNumber = true;
+
+  logPrintf("Received number: %ld\n", _agitation);
+  server.send(200, "text/html",
+              buildHtmlPage("Received number: " + String(_agitation)));
+}
+
+void handleGetNumber() {
+  String json = String("{\"number\":") + String(_agitation) +
+                ",\"hasNumber\":" + (hasReceivedNumber ? "true" : "false") + "}";
+  server.send(200, "application/json", json);
+}
+
 void setupWebServer() {
   if (webServerStarted) return;
 
   server.on("/",        HTTP_GET,  handleRoot);
   server.on("/rename",  HTTP_POST, handleRename);
   server.on("/identify",HTTP_POST, handleIdentify);
+  server.on("/sendNumber", HTTP_POST, handleSendNumber);
+  server.on("/number", HTTP_GET, handleGetNumber);
+  server.on("/setNumber", HTTP_POST, handleSetNumber);
 
   server.on("/update", HTTP_POST, []() {
     bool ok = !Update.hasError();
@@ -179,21 +280,125 @@ void setupWebServer() {
   }, []() {
     HTTPUpload& upload = server.upload();
     if (upload.status == UPLOAD_FILE_START) {
-      Serial.printf("Update start: %s\n", upload.filename.c_str());
+      logPrintf("Update start: %s\n", upload.filename.c_str());
       if (!Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_WRITE) {
       if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
         Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_END) {
-      if (Update.end(true)) Serial.printf("Update success: %u bytes\n", upload.totalSize);
+      if (Update.end(true)) logPrintf("Update success: %u bytes\n", upload.totalSize);
       else Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_ABORTED) {
       Update.abort();
-      Serial.println("Update aborted");
+      logPrintln("Update aborted");
     }
   });
 
   server.begin();
   webServerStarted = true;
-  Serial.println("Web server started");
+  logPrintln("Web server started");
+}
+
+
+//Log support
+
+// Global log buffer
+String serialLog;
+
+void logPrint(const String &s) {
+    logPrint(s);
+    serialLog += s;
+    trimLog();
+}
+
+void logPrint(const char *s) {
+    logPrint(s);
+    serialLog += s;
+    trimLog();
+}
+
+void logPrint(char c) {
+    logPrint(c);
+    serialLog += c;
+    trimLog();
+}
+
+void logPrint(int v) {
+    logPrint(v);
+    serialLog += String(v);
+    trimLog();
+}
+
+void logPrint(unsigned int v) {
+    logPrint(v);
+    serialLog += String(v);
+    trimLog();
+}
+
+void logPrint(long v) {
+    logPrint(v);
+    serialLog += String(v);
+    trimLog();
+}
+
+void logPrint(unsigned long v) {
+    logPrint(v);
+    serialLog += String(v);
+    trimLog();
+}
+
+void logPrint(float v) {
+    logPrint(v);
+    serialLog += String(v);
+    trimLog();
+}
+
+void logPrint(double v) {
+    logPrint(v);
+    serialLog += String(v);
+    trimLog();
+
+}
+
+template<typename T>
+void logPrintln(const T &value) {
+    logPrint(value);
+    logPrint("\r\n");
+    trimLog();
+}
+
+const size_t MAX_LOG_SIZE = 4096;
+
+void trimLog() {
+    if (serialLog.length() > MAX_LOG_SIZE) {
+        serialLog.remove(0, serialLog.length() - MAX_LOG_SIZE);
+    }
+}
+
+void logPrintf(const char *format, ...) {
+    char buffer[256];
+
+    va_list args;
+    va_start(args, format);
+    int len = vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    // Handle strings larger than our buffer
+    if (len >= (int)sizeof(buffer)) {
+        char *bigBuffer = new char[len + 1];
+
+        va_start(args, format);
+        vsnprintf(bigBuffer, len + 1, format, args);
+        va_end(args);
+
+        Serial.print(bigBuffer);
+        serialLog += bigBuffer;
+
+        delete[] bigBuffer;
+    } else {
+        Serial.print(buffer);
+        serialLog += buffer;
+    }
+
+    trimLog();
 }
