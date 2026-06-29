@@ -306,55 +306,55 @@ void setupWebServer() {
 String serialLog;
 
 void logPrint(const String &s) {
-    logPrint(s);
+    Serial.print(s);
     serialLog += s;
     trimLog();
 }
 
 void logPrint(const char *s) {
-    logPrint(s);
+    Serial.print(s);
     serialLog += s;
     trimLog();
 }
 
 void logPrint(char c) {
-    logPrint(c);
+    Serial.print(c);
     serialLog += c;
     trimLog();
 }
 
 void logPrint(int v) {
-    logPrint(v);
+    Serial.print(v);
     serialLog += String(v);
     trimLog();
 }
 
 void logPrint(unsigned int v) {
-    logPrint(v);
+    Serial.print(v);
     serialLog += String(v);
     trimLog();
 }
 
 void logPrint(long v) {
-    logPrint(v);
+    Serial.print(v);
     serialLog += String(v);
     trimLog();
 }
 
 void logPrint(unsigned long v) {
-    logPrint(v);
+    Serial.print(v);
     serialLog += String(v);
     trimLog();
 }
 
 void logPrint(float v) {
-    logPrint(v);
+    Serial.print(v);
     serialLog += String(v);
     trimLog();
 }
 
 void logPrint(double v) {
-    logPrint(v);
+    Serial.print(v);
     serialLog += String(v);
     trimLog();
 
@@ -362,8 +362,8 @@ void logPrint(double v) {
 
 template<typename T>
 void logPrintln(const T &value) {
-    logPrint(value);
-    logPrint("\r\n");
+    Serial.print(value);
+    Serial.print("\r\n");
     trimLog();
 }
 

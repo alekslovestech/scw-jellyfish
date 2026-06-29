@@ -14,11 +14,11 @@
 using StripBus = NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>;
 
 HX711 scale;
-const int HX711_DOUT = 11;
-const int HX711_SCK  = 10;
+const int HX711_DOUT = 13;
+const int HX711_SCK  = 14;
 float calibration_factor = -14850;
 bool hasScale = false;
-bool isJelly = true;
+bool isJelly = false;
 
 constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
 constexpr uint16_t NUM_STRIPS = 14;
@@ -38,7 +38,7 @@ struct Pos3D ledPos[8][NUM_LEDS_PER_STRIP];
 
 
 int PINS[NUM_STRIPS] = {
-  4,5,6,7,8,9,12,13,14,15,16,17,18,21
+  4,5,6,7,9,10,11,12,15,16,17,18
 }; // consider skipping pin 8
 StripBus strips[] = {
   {NUM_LEDS_PER_STRIP, PINS[0]},
@@ -53,8 +53,8 @@ StripBus strips[] = {
   {NUM_LEDS_PER_STRIP, PINS[9]},
   {NUM_LEDS_PER_STRIP, PINS[10]},
   {NUM_LEDS_PER_STRIP, PINS[11]},
-  {NUM_LEDS_PER_STRIP, PINS[12]},
-  {NUM_LEDS_PER_STRIP, PINS[13]},
+ // {NUM_LEDS_PER_STRIP, PINS[12]},
+ // {NUM_LEDS_PER_STRIP, PINS[13]},
  // {NUM_LEDS_PER_STRIP, PINS[14]},
  // {NUM_LEDS_PER_STRIP, PINS[15]},
 };
@@ -134,7 +134,8 @@ void saveDeviceName(const String& newName) {
 void setup() {
   Serial.begin(115200);
   delay(200);
-
+  Serial.println("test");
+  logPrintln("Test log");
   loadIdentity();
 
   for (int i=0; i<NUM_STRIPS; i++) {
@@ -157,7 +158,7 @@ void setup() {
   } else {
     logPrintln("Running offline; LEDs active, Wi-Fi will retry later.");
   }
-  if (deviceName.indexOf("jelly") >= 0) isJelly = true;
+  //if (deviceName.indexOf("jelly") >= 0) isJelly = true;
   //if (deviceName == "sender") hasScale = true;
   if (hasScale) {
     scale.begin(HX711_DOUT, HX711_SCK);

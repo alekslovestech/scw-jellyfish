@@ -31,6 +31,7 @@ void drawFrame() {
   start.y = 0.0f;
   start.z = 0.2f;
   */
+  showColorWheelAcrossEightStrips();
   if (isJelly) {
     if (_ledFrame%900==0) {
       point.x = random(-200,200)/100.0f;
