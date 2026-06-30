@@ -1,6 +1,8 @@
 #include <HTTPClient.h>
 #include <esp_wifi.h>
 
+// Global log buffer
+String serialLog;
 
 String lastSendStatus = "Ready";
 bool hasReceivedNumber = false;
@@ -76,16 +78,21 @@ void startMDNSIfNeeded() {
   if (WiFi.status() != WL_CONNECTED || mdnsStarted) return;
   if (MDNS.begin(deviceName.c_str())) {
     mdnsStarted = true;
+
+    MDNS.addService("esp32art", "tcp", 80);
+    MDNS.addServiceTxt("esp32art", "tcp", "name", deviceName.c_str());
+    MDNS.addServiceTxt("esp32art", "tcp", "fw", FW_VERSION);
+    MDNS.addServiceTxt("esp32art", "tcp", "chip", chipIdHex.c_str());
+    MDNS.addServiceTxt("esp32art", "tcp", "mac", getMacAddressString().c_str());
+    MDNS.addServiceTxt("esp32art", "tcp", "ssid", currentSSID.c_str());
+
     logPrintf("mDNS started: http://%s.local\n", deviceName.c_str());
   } else {
     logPrintln("mDNS failed to start");
   }
 }
 
-// ── Web server + OTA (UI + portal logic to move into TypeScript) ───────────────
-
-// TODO: the page generation, HTML UI and web portal behavior should be moved out
-// to a TypeScript-based portal. Keep the ESP endpoints here for now.
+// ── Web server + OTA 
 
 String htmlEscape(const String& in) {
   String out = in;
@@ -222,6 +229,22 @@ void handleRename() {
   ESP.restart();
 }
 
+void handleStatus() {
+  String json = "{";
+  json += "\"name\":\"" + deviceName + "\",";
+  json += "\"firmware\":\"" FW_VERSION "\",";
+  json += "\"chip\":\"" + chipIdHex + "\",";
+  json += "\"mac\":\"" + getMacAddressString() + "\",";
+  json += "\"ssid\":\"" + currentSSID + "\",";
+  json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
+  json += "\"rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",";
+  json += "\"number\":" + String(_agitation) + ",";
+  json += "\"hasNumber\":" + String(hasReceivedNumber ? "true" : "false");
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
 void handleIdentify() {
   identifyRequested = true;
   server.send(200, "text/html", buildHtmlPage("Identify sequence requested."));
@@ -262,6 +285,10 @@ void handleGetNumber() {
   server.send(200, "application/json", json);
 }
 
+void handleLog() {
+  server.send(200, "text/plain", serialLog);
+}
+
 void setupWebServer() {
   if (webServerStarted) return;
 
@@ -271,6 +298,8 @@ void setupWebServer() {
   server.on("/sendNumber", HTTP_POST, handleSendNumber);
   server.on("/number", HTTP_GET, handleGetNumber);
   server.on("/setNumber", HTTP_POST, handleSetNumber);
+  server.on("/log", HTTP_GET, handleLog);
+  server.on("/status", HTTP_GET, handleStatus);
 
   server.on("/update", HTTP_POST, []() {
     bool ok = !Update.hasError();
@@ -301,10 +330,6 @@ void setupWebServer() {
 
 
 //Log support
-
-// Global log buffer
-String serialLog;
-
 void logPrint(const String &s) {
     Serial.print(s);
     serialLog += s;
@@ -364,6 +389,10 @@ template<typename T>
 void logPrintln(const T &value) {
     Serial.print(value);
     Serial.print("\r\n");
+
+    serialLog += String(value);
+    serialLog += "\r\n";
+
     trimLog();
 }
 
