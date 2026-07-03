@@ -1,5 +1,9 @@
 #include <HTTPClient.h>
 #include <esp_wifi.h>
+#include <WiFiUdp.h>
+
+WiFiUDP udp;
+const int MUSIC_UDP_PORT = 4210;
 
 // Global log buffer
 String serialLog;
@@ -89,6 +93,45 @@ void startMDNSIfNeeded() {
     logPrintf("mDNS started: http://%s.local\n", deviceName.c_str());
   } else {
     logPrintln("mDNS failed to start");
+  }
+}
+
+
+
+// UDP server for rapid sharing of eg music volume
+
+void setupMusicUdp() {
+  udp.begin(MUSIC_UDP_PORT);
+  logPrintf("Music UDP listening on port %d\n", MUSIC_UDP_PORT);
+}
+
+void handleMusicUdp() {
+  int packetSize = udp.parsePacket();
+  if (!packetSize) return;
+
+  char packet[128];
+  int len = udp.read(packet, sizeof(packet) - 1);
+  if (len <= 0) return;
+  packet[len] = '\0';
+
+  char mode[24];
+  float level;
+  int beat;
+  int hue;
+  float phase;
+
+  // Expected:
+  // heartbeat,0.843,1,0,0.032
+  int matched = sscanf(packet, "%23[^,],%f,%d,%d,%f",
+                       mode, &level, &beat, &hue, &phase);
+
+  if (matched == 5 && String(mode) == "heartbeat") {
+    if (heartbeatLevel==0) logPrint("New heartbeat detected");
+    heartbeatLevel = constrain(level, 0.0, 1.0);
+    heartbeatBeat = beat > 0;
+    heartbeatHue = constrain(hue, 0, 255);
+    heartbeatPhase = constrain(phase, 0.0, 1.0);
+    lastHeartbeatPacketMs = millis();
   }
 }
 
@@ -239,6 +282,8 @@ void handleStatus() {
   json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
   json += "\"rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",";
   json += "\"number\":" + String(_agitation) + ",";
+  json += "\"hasScale\":" + String(hasScale ? "true" : "false") + ",";
+  json += "\"isJelly\":" + String(isJelly ? "true" : "false") + ",";
   json += "\"hasNumber\":" + String(hasReceivedNumber ? "true" : "false");
   json += "}";
 
@@ -289,6 +334,28 @@ void handleLog() {
   server.send(200, "text/plain", serialLog);
 }
 
+void handleConfig() {
+  bool newHasScale = hasScale;
+  bool newIsJelly = isJelly;
+
+  if (server.hasArg("hasScale")) {
+    String v = server.arg("hasScale");
+    newHasScale = (v == "1" || v == "true" || v == "on");
+  }
+
+  if (server.hasArg("isJelly")) {
+    String v = server.arg("isJelly");
+    newIsJelly = (v == "1" || v == "true" || v == "on");
+  }
+
+  saveDeviceConfig(newHasScale, newIsJelly);
+
+  server.send(200, "application/json",
+    String("{\"ok\":true,\"hasScale\":") + (hasScale ? "true" : "false") +
+    ",\"isJelly\":" + (isJelly ? "true" : "false") + "}"
+  );
+}
+
 void setupWebServer() {
   if (webServerStarted) return;
 
@@ -300,6 +367,7 @@ void setupWebServer() {
   server.on("/setNumber", HTTP_POST, handleSetNumber);
   server.on("/log", HTTP_GET, handleLog);
   server.on("/status", HTTP_GET, handleStatus);
+  server.on("/config", HTTP_POST, handleConfig);
 
   server.on("/update", HTTP_POST, []() {
     bool ok = !Update.hasError();

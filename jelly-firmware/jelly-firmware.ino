@@ -13,15 +13,29 @@
 
 using StripBus = NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>;
 
+float musicLevel = 0.0;
+float musicBass = 0.0;
+float musicMid = 0.0;
+float musicHigh = 0.0;
+bool musicBeat = false;
+
+float heartbeatLevel = 0.0;
+bool heartbeatBeat = false;
+int heartbeatHue = 0;
+float heartbeatPhase = 0.0;
+
+unsigned long lastHeartbeatPacketMs = 0;
+
 HX711 scale;
-const int HX711_DOUT = 13;
-const int HX711_SCK  = 14;
+const int HX711_DOUT = 14;
+const int HX711_SCK  = 13;
 float calibration_factor = -14850;
+constexpr unsigned long HX711_READY_TIMEOUT_MS = 1500;
 bool hasScale = false;
 bool isJelly = false;
 
 constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
-constexpr uint16_t NUM_STRIPS = 14;
+constexpr uint16_t NUM_STRIPS = 12;
 
 struct Pos2D {
   float x;
@@ -129,14 +143,67 @@ void saveDeviceName(const String& newName) {
   deviceName = cleaned;
 }
 
+void loadDeviceConfig() {
+  prefs.begin("config", false);
+  hasScale = prefs.getBool("hasScale", false);
+  isJelly  = prefs.getBool("isJelly", false);
+  prefs.end();
+}
+
+void saveDeviceConfig(bool newHasScale, bool newIsJelly) {
+  prefs.begin("config", false);
+  prefs.putBool("hasScale", newHasScale);
+  prefs.putBool("isJelly", newIsJelly);
+  prefs.end();
+
+  hasScale = newHasScale;
+  isJelly = newIsJelly;
+}
+
+bool initScaleWithTimeout(unsigned long timeoutMs) {
+  scale.begin(HX711_DOUT, HX711_SCK);
+
+  unsigned long start = millis();
+  while (!scale.is_ready()) {
+    if (millis() - start >= timeoutMs) {
+      logPrintln("HX711 not ready. Disabling scale for this boot.");
+      return false;
+    }
+
+    // Keep Wi-Fi/web server responsive while waiting.
+    if (webServerStarted && WiFi.status() == WL_CONNECTED) {
+      server.handleClient();
+    }
+
+    delay(10);
+  }
+
+  scale.set_scale(calibration_factor);
+
+  logPrintln("HX711 ready. Taring scale...");
+
+  // HX711 library tare() can block because it reads multiple samples.
+  // Since is_ready() succeeded, this should usually be safe, but keep reads low.
+  scale.tare(3);
+
+  logPrintln("Scale initialized.");
+  return true;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println("test");
-  logPrintln("Test log");
+
   loadIdentity();
+  loadDeviceConfig();
+
+  logPrint("Config hasScale: ");
+  logPrintln(hasScale ? "true" : "false");
+
+  logPrint("Config isJelly: ");
+  logPrintln(isJelly ? "true" : "false");
 
   for (int i=0; i<NUM_STRIPS; i++) {
     strips[i].Begin();
@@ -158,12 +225,16 @@ void setup() {
   } else {
     logPrintln("Running offline; LEDs active, Wi-Fi will retry later.");
   }
-  //if (deviceName.indexOf("jelly") >= 0) isJelly = true;
-  //if (deviceName == "sender") hasScale = true;
+
   if (hasScale) {
-    scale.begin(HX711_DOUT, HX711_SCK);
-    scale.set_scale(calibration_factor);
-    scale.tare();  // zero the scale
+    bool scaleOk = initScaleWithTimeout(HX711_READY_TIMEOUT_MS);
+
+    if (!scaleOk) {
+      // Important: do NOT overwrite the saved hasScale setting here.
+      // This keeps the dashboard showing the intended config, but prevents
+      // the current boot from hanging.
+      hasScale = false;
+    }
   }
 
   logPrintln("Calculating LED positions");
@@ -173,6 +244,8 @@ void setup() {
     }
   }
 
+  setupMusicUdp();
+
 }
 
 void loop() {
@@ -181,6 +254,7 @@ void loop() {
   }
 
   ensureWiFi();
+  handleMusicUdp();
 
   if (identifyRequested) {
     identifyRequested = false;

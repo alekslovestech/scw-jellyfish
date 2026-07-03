@@ -31,14 +31,22 @@ void drawFrame() {
   start.y = 0.0f;
   start.z = 0.2f;
   */
-  showColorWheelAcrossEightStrips();
+
+
   if (isJelly) {
-    if (_ledFrame%900==0) {
-      point.x = random(-200,200)/100.0f;
-      point.y = random(-200,50)/100.0f;
-      point.z = random(-200,200)/100.0f;
+    if (millis() - lastHeartbeatPacketMs < 3000) {
+      heartbeat();
+    } 
+    else {
+      if (_ledFrame%900==0) {
+        point.x = random(-200,200)/100.0f;
+        point.y = random(-200,50)/100.0f;
+        point.z = random(-200,200)/100.0f;
+      }
+      rippleOutFromPoint(point, _ledFrame%900);
     }
-    rippleOutFromPoint(point, _ledFrame%900);
+  } else {
+    showColorWheelAcrossEightStrips();
   }
   /*if (_ledFrame%900==300) {
     point2.x = random(-200,200)/100.0f;
@@ -57,9 +65,7 @@ void drawFrame() {
   if (hasScale && scale.is_ready()) {
     _weight = scale.get_units(1);  
     weightUpdate();
-    sendNumberToPeer("receiver.local", _agitation);
   }
-  if (deviceName == "receiver") sensorDemo();
   _ledFrame++;
 }
 
@@ -90,6 +96,31 @@ void sensorDemo() {
   for (int s = 0; s < NUM_STRIPS; s++) {
     strips[s].Show();
   };
+}
+
+void heartbeat() {
+  // Fade out if no heartbeat packets have arrived recently
+  if (millis() - lastHeartbeatPacketMs > 1000) {
+    heartbeatLevel *= 0.96;
+  }
+
+  float brightness = (heartbeatLevel * 255);
+
+  struct Pos3D startPoint;
+  startPoint.x = 0.0f;
+  startPoint.y = -0.3f;
+  startPoint.z = 0.0f;
+  float distanceSQ = 0.0f;
+  float distance = 0.0f;
+  
+  for (int s = 0; s < 8; s++) {
+    for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
+      distanceSQ = (startPoint.x-ledPos[s][p].x)*(startPoint.x-ledPos[s][p].x)+(startPoint.y-ledPos[s][p].y)*(startPoint.y-ledPos[s][p].y)+(startPoint.z-ledPos[s][p].z)*(startPoint.z-ledPos[s][p].z);
+      distance = sqrtf(distanceSQ);
+      strips[s].SetPixelColor(p, RgbColor(max(0.0f,brightness-500*max(distance-0.1f,0.0f)),0,0));
+    }
+  }
+
 }
 
 void rippleOutFromPoint(struct Pos3D startPoint, int frame) {
