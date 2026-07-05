@@ -398,6 +398,10 @@ const PATTERNS = [
   ['colorwheel', 'Color wheel'],
   ['bottomfill', 'Bottom fill'],
   ['sensordemo', 'Sensor demo'],
+  ['fallingRain', 'Falling rain'],
+  ['movementSimulation', 'Movement simulation'],
+  ['innerSpreadWave', 'Inner spread wave'],
+  ['rainbowWave', 'Rainbow wave'],
 ];
 
 function patternSelect(current){
