@@ -49,6 +49,8 @@ struct Pos3D {
 };
 
 struct Pos3D devicePos = {0.0f, 0.0f, 0.0f};
+
+//positions of (num of strips * number of leds)
 struct Pos3D ledPos[8][NUM_LEDS_PER_STRIP];
 
 
