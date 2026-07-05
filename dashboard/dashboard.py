@@ -7,24 +7,22 @@ keeps status fresh, and lets you identify, rename, send values, and upload OTA f
 """
 
 from __future__ import annotations
-
 import asyncio
 import socket
 import time
 from contextlib import asynccontextmanager
+
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
-
 from device import DEVICE_TIMEOUT_SECONDS, Device
 
 SERVICE_TYPE = "_esp32art._tcp.local."
 POLL_INTERVAL_SECONDS = 2.0
 REQUEST_TIMEOUT_SECONDS = 2.0
-
 
 DEVICES: dict[str, Device] = {}
 
@@ -139,8 +137,8 @@ async def poll_device(client: httpx.AsyncClient, d: Device) -> None:
         d.has_scale = bool(data.get("hasScale", d.has_scale))
         d.is_jelly = bool(data.get("isJelly", d.is_jelly))
         d.posX = float(data.get("posX", d.posX))
-        d.posY = float(data.get("posX", d.posY))
-        d.posZ = float(data.get("posX", d.posZ))
+        d.posY = float(data.get("posY", d.posY))
+        d.posZ = float(data.get("posZ", d.posZ))
         if data.get("rssi") is not None:
             d.rssi = int(data.get("rssi"))
             d.signal_quality = rssi_quality(d.rssi)
@@ -228,6 +226,35 @@ async def api_config(
 
     return {"ok": r.status_code < 300, "http": r.status_code, "body": r.text[:200]}
 
+
+@app.post("/api/device/{key}/position", response_model=None)
+async def api_position(
+    key: str,
+    posX: float = Form(...),
+    posY: float = Form(...),
+    posZ: float = Form(...),
+):
+    d = get_device_or_404(key)
+    if isinstance(d, JSONResponse):
+        return d
+
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
+        r = await client.post(
+            f"{d.base_url}/position",
+            data={
+                "posX": str(posX),
+                "posY": str(posY),
+                "posZ": str(posZ),
+            },
+        )
+
+    if r.status_code < 300:
+        d.posX = posX
+        d.posY = posY
+        d.posZ = posZ
+
+    return {"ok": r.status_code < 300, "http": r.status_code, "body": r.text[:200]}
+
 @app.post("/api/device/{key}/set-number", response_model=None)
 async def api_set_number(key: str, value: float = Form(...)):
     d = get_device_or_404(key)
@@ -291,7 +318,7 @@ DASHBOARD_HTML = r"""
     table{border-collapse:collapse;width:100%;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px #0001}
     th,td{text-align:left;padding:10px;border-bottom:1px solid #eee;vertical-align:middle}th{background:#f0f0f0}
     .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px}.on{background:#19a34a}.off{background:#c22}
-    .actions{display:flex;gap:6px;flex-wrap:wrap}.actions form{display:inline-flex;gap:6px;align-items:center}.small{width:90px}.name{width:140px}.log{white-space:pre-wrap;background:#111;color:#eee;padding:12px;border-radius:8px;min-height:40px}.deviceLog{max-height:420px;overflow:auto}.panel{margin-top:20px;background:white;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}.hidden{display:none}.rowbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}.actions form{display:inline-flex;gap:6px;align-items:center}.small{width:90px}.name{width:140px}.loc{width:72px}.locationForm{display:flex;gap:6px;align-items:end;flex-wrap:wrap}.locationForm label{font-size:12px;color:#555}.locationForm input{display:block;margin-top:2px}.log{white-space:pre-wrap;background:#111;color:#eee;padding:12px;border-radius:8px;min-height:40px}.deviceLog{max-height:420px;overflow:auto}.panel{margin-top:20px;background:white;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}.hidden{display:none}.rowbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
   </style>
 </head>
 <body>
@@ -392,7 +419,7 @@ async function refreshDeviceLog(){
 async function refresh(force=false){
   if(!force && tableHasActiveFormState()) return;
   const data = await fetch('/api/devices').then(r => r.json());
-  if(!data.devices.length){ rows.innerHTML = '<tr><td colspan="8">Waiting for ESP32 devices...</td></tr>'; return; }
+  if(!data.devices.length){ rows.innerHTML = '<tr><td colspan="9">Waiting for ESP32 devices...</td></tr>'; return; }
   rows.innerHTML = data.devices.map(d => `
     <tr>
       <td><span class="dot ${d.online?'on':'off'}"></span>${d.online?'Online':'Offline'}${d.statusError ? '<br><small>'+esc(d.statusError)+'</small>' : ''}</td>
@@ -400,7 +427,14 @@ async function refresh(force=false){
       <td><a href="${esc(d.url)}" target="_blank">${esc(d.ip)}</a><br><small>${esc(d.host)}</small></td>
       <td>${esc(d.firmware || '-')}<br><small>${esc(d.ssid || '')}</small></td>
       <td>${signalHtml(d)}</td>
-      <td>${d.hasNumber ? esc(d.number) : '-'}</td>
+      <td>
+        <form class="locationForm" onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/position', this)">
+          <label>X<input class="loc" name="posX" type="number" step="any" value="${esc(d.posX ?? 0)}"></label>
+          <label>Y<input class="loc" name="posY" type="number" step="any" value="${esc(d.posY ?? 0)}"></label>
+          <label>Z<input class="loc" name="posZ" type="number" step="any" value="${esc(d.posZ ?? 0)}"></label>
+          <button>Save</button>
+        </form>
+      </td>
       <td>
         Scale: ${d.hasScale ? 'yes' : 'no'}<br>
         Jelly: ${d.isJelly ? 'yes' : 'no'}

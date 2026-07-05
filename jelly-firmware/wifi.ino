@@ -399,6 +399,7 @@ void setupWebServer() {
   server.on("/log", HTTP_GET, handleLog);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/config", HTTP_POST, handleConfig);
+  server.on("/position", HTTP_POST, handlePosition);
 
   server.on("/update", HTTP_POST, []() {
     bool ok = !Update.hasError();
