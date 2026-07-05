@@ -48,6 +48,7 @@ struct Pos3D {
   float z;
 };
 
+struct Pos3D devicePos = {0.0f, 0.0f, 0.0f};
 struct Pos3D ledPos[8][NUM_LEDS_PER_STRIP];
 
 
@@ -147,6 +148,9 @@ void loadDeviceConfig() {
   prefs.begin("config", false);
   hasScale = prefs.getBool("hasScale", false);
   isJelly  = prefs.getBool("isJelly", false);
+  devicePos.x = prefs.getFloat("posX", 0.0);
+  devicePos.y = prefs.getFloat("posY", 0.0);
+  devicePos.z = prefs.getFloat("posZ", 0.0);
   prefs.end();
 }
 
@@ -158,6 +162,18 @@ void saveDeviceConfig(bool newHasScale, bool newIsJelly) {
 
   hasScale = newHasScale;
   isJelly = newIsJelly;
+}
+
+void saveDevicePos(Pos3D pos) {
+  prefs.begin("config", false);
+
+  prefs.putFloat("posX", pos.x);
+  prefs.putFloat("posY", pos.y);
+  prefs.putFloat("posZ", pos.z);
+
+  prefs.end();
+
+  devicePos = pos;
 }
 
 bool initScaleWithTimeout(unsigned long timeoutMs) {
@@ -205,6 +221,14 @@ void setup() {
   logPrint("Config isJelly: ");
   logPrintln(isJelly ? "true" : "false");
 
+  logPrint("Device position: ");
+  logPrint(devicePos.x);
+  logPrint(", ");
+  logPrint(devicePos.y);
+  logPrint(", ");
+  logPrintln(devicePos.z);
+
+
   for (int i=0; i<NUM_STRIPS; i++) {
     strips[i].Begin();
     strips[i].Show();
@@ -245,6 +269,7 @@ void setup() {
   }
 
   setupMusicUdp();
+  setupScaleUdp();
 
 }
 

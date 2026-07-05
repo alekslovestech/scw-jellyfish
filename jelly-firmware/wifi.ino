@@ -3,10 +3,9 @@
 #include <WiFiUdp.h>
 
 WiFiUDP udp;
+WiFiUDP scaleUdp;
 const int MUSIC_UDP_PORT = 4210;
-
-// Global log buffer
-String serialLog;
+const int SCALE_UDP_PORT = 4211;
 
 String lastSendStatus = "Ready";
 bool hasReceivedNumber = false;
@@ -135,6 +134,11 @@ void handleMusicUdp() {
   }
 }
 
+void setupScaleUdp() {
+  scaleUdp.begin(SCALE_UDP_PORT);
+  logPrintf("Scale UDP listening on port %d\n", SCALE_UDP_PORT);
+}
+
 // ── Web server + OTA 
 
 String htmlEscape(const String& in) {
@@ -152,7 +156,7 @@ String wifiStatusText() {
   return "Not connected";
 }
 
-
+/*
 // ── Send number to the other device ───────────────────────────────────────────
 bool sendNumberToPeer(const String& host, float value) {
   if (WiFi.status() != WL_CONNECTED) {
@@ -187,7 +191,7 @@ bool sendNumberToPeer(const String& host, float value) {
     return false;
   }
 }
-
+*/
 
 String buildHtmlPage(const String& message = "") {
   String html;
@@ -281,10 +285,13 @@ void handleStatus() {
   json += "\"ssid\":\"" + currentSSID + "\",";
   json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
   json += "\"rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",";
-  json += "\"number\":" + String(_agitation) + ",";
+  //json += "\"number\":" + String(_agitation) + ",";
   json += "\"hasScale\":" + String(hasScale ? "true" : "false") + ",";
   json += "\"isJelly\":" + String(isJelly ? "true" : "false") + ",";
-  json += "\"hasNumber\":" + String(hasReceivedNumber ? "true" : "false");
+  //json += "\"hasNumber\":" + String(hasReceivedNumber ? "true" : "false");
+  json += "\"posX\":" + String(devicePos.x) + ",";
+  json += "\"posY\":" + String(devicePos.y) + ",";
+  json += "\"posZ\":" + String(devicePos.z);
   json += "}";
 
   server.send(200, "application/json", json);
@@ -295,7 +302,7 @@ void handleIdentify() {
   server.send(200, "text/html", buildHtmlPage("Identify sequence requested."));
 }
 
-void handleSendNumber() {
+/*void handleSendNumber() {
   if (!server.hasArg("target") || !server.hasArg("value")) {
     server.send(400, "text/plain", "Missing 'target' or 'value' field");
     return;
@@ -328,7 +335,7 @@ void handleGetNumber() {
   String json = String("{\"number\":") + String(_agitation) +
                 ",\"hasNumber\":" + (hasReceivedNumber ? "true" : "false") + "}";
   server.send(200, "application/json", json);
-}
+}*/
 
 void handleLog() {
   server.send(200, "text/plain", serialLog);
@@ -356,15 +363,39 @@ void handleConfig() {
   );
 }
 
+void handlePosition() {
+  struct Pos3D newPos = devicePos;
+
+  if (server.hasArg("posX")) {
+    newPos.x = server.arg("posX").toFloat();
+  }
+
+  if (server.hasArg("posY")) {
+    newPos.y = server.arg("posY").toFloat();
+  }
+
+  if (server.hasArg("posZ")) {
+    newPos.z = server.arg("posZ").toFloat();
+  }
+
+  saveDevicePos(newPos);
+
+  server.send(200, "application/json",
+    String("{\"ok\":true,\"posX\":") + String(devicePos.x, 3) +
+    ",\"posY\":" + String(devicePos.y, 3) +
+    ",\"posZ\":" + String(devicePos.z, 3) + "}"
+  );
+}
+
 void setupWebServer() {
   if (webServerStarted) return;
 
   server.on("/",        HTTP_GET,  handleRoot);
   server.on("/rename",  HTTP_POST, handleRename);
   server.on("/identify",HTTP_POST, handleIdentify);
-  server.on("/sendNumber", HTTP_POST, handleSendNumber);
-  server.on("/number", HTTP_GET, handleGetNumber);
-  server.on("/setNumber", HTTP_POST, handleSetNumber);
+  //server.on("/sendNumber", HTTP_POST, handleSendNumber);
+  //server.on("/number", HTTP_GET, handleGetNumber);
+  //server.on("/setNumber", HTTP_POST, handleSetNumber);
   server.on("/log", HTTP_GET, handleLog);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/config", HTTP_POST, handleConfig);
@@ -397,105 +428,4 @@ void setupWebServer() {
 }
 
 
-//Log support
-void logPrint(const String &s) {
-    Serial.print(s);
-    serialLog += s;
-    trimLog();
-}
 
-void logPrint(const char *s) {
-    Serial.print(s);
-    serialLog += s;
-    trimLog();
-}
-
-void logPrint(char c) {
-    Serial.print(c);
-    serialLog += c;
-    trimLog();
-}
-
-void logPrint(int v) {
-    Serial.print(v);
-    serialLog += String(v);
-    trimLog();
-}
-
-void logPrint(unsigned int v) {
-    Serial.print(v);
-    serialLog += String(v);
-    trimLog();
-}
-
-void logPrint(long v) {
-    Serial.print(v);
-    serialLog += String(v);
-    trimLog();
-}
-
-void logPrint(unsigned long v) {
-    Serial.print(v);
-    serialLog += String(v);
-    trimLog();
-}
-
-void logPrint(float v) {
-    Serial.print(v);
-    serialLog += String(v);
-    trimLog();
-}
-
-void logPrint(double v) {
-    Serial.print(v);
-    serialLog += String(v);
-    trimLog();
-
-}
-
-template<typename T>
-void logPrintln(const T &value) {
-    Serial.print(value);
-    Serial.print("\r\n");
-
-    serialLog += String(value);
-    serialLog += "\r\n";
-
-    trimLog();
-}
-
-const size_t MAX_LOG_SIZE = 4096;
-
-void trimLog() {
-    if (serialLog.length() > MAX_LOG_SIZE) {
-        serialLog.remove(0, serialLog.length() - MAX_LOG_SIZE);
-    }
-}
-
-void logPrintf(const char *format, ...) {
-    char buffer[256];
-
-    va_list args;
-    va_start(args, format);
-    int len = vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    // Handle strings larger than our buffer
-    if (len >= (int)sizeof(buffer)) {
-        char *bigBuffer = new char[len + 1];
-
-        va_start(args, format);
-        vsnprintf(bigBuffer, len + 1, format, args);
-        va_end(args);
-
-        Serial.print(bigBuffer);
-        serialLog += bigBuffer;
-
-        delete[] bigBuffer;
-    } else {
-        Serial.print(buffer);
-        serialLog += buffer;
-    }
-
-    trimLog();
-}

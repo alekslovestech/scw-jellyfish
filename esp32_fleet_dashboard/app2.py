@@ -46,6 +46,9 @@ class Device:
     status_error: str = ""
     has_scale: bool = False
     is_jelly: bool = False
+    posX: float = 0.0
+    posY: float = 0.0
+    posZ: float = 0.0
 
     @property
     def base_url(self) -> str:
@@ -73,6 +76,9 @@ class Device:
             "statusError": self.status_error,
             "hasScale": self.has_scale,
             "isJelly": self.is_jelly,
+            "posX": self.posX,
+            "posY": self.posY,
+            "posZ": self.posZ,
         }
 
 
@@ -188,6 +194,9 @@ async def poll_device(client: httpx.AsyncClient, d: Device) -> None:
         d.ssid = data.get("ssid", d.ssid)
         d.has_scale = bool(data.get("hasScale", d.has_scale))
         d.is_jelly = bool(data.get("isJelly", d.is_jelly))
+        d.posX = float(data.get("posX", d.posX))
+        d.posY = float(data.get("posX", d.posY))
+        d.posZ = float(data.get("posX", d.posZ))
         if data.get("rssi") is not None:
             d.rssi = int(data.get("rssi"))
             d.signal_quality = rssi_quality(d.rssi)
@@ -351,7 +360,7 @@ DASHBOARD_HTML = r"""
   </div>
 
   <table>
-    <thead><tr><th>Status</th><th>Name</th><th>Address</th><th>Firmware</th><th>Signal</th><th>Number</th><th>Config</th><th>Last seen</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Status</th><th>Name</th><th>Address</th><th>Firmware</th><th>Signal</th><th>Position</th><th>Config</th><th>Last seen</th><th>Actions</th></tr></thead>
     <tbody id="rows"><tr><td colspan="9">Waiting for ESP32 devices...</td></tr></tbody>
   </table>
 
