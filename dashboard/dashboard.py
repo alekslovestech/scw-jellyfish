@@ -470,9 +470,8 @@ async function refresh(force=false){
           </form>
         <button onclick="fetch('/api/device/${encodeURIComponent(d.key)}/identify',{method:'POST'}).then(r=>r.json()).then(x=>{log.textContent=JSON.stringify(x,null,2); refresh();})">Blink</button>
         <button data-key="${esc(d.key)}" data-name="${esc(d.name)}" onclick="openDeviceLog(this.dataset.key, this.dataset.name)">Log</button>
-        <form onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/set-number', this)"><input class="small" name="value" type="number" step="any" value="123"><button>Send</button></form>
         <form class="renameForm" data-key="${esc(d.key)}" onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/rename', this)"><input class="name renameInput" data-key="${esc(d.key)}" name="name" value="${esc(renameDrafts.get(d.key) ?? d.name)}"><button>Rename</button></form>
-        <form class="singleUpdate" onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/update', this)"><input name="update" type="file" accept=".bin"><button>OTA</button></form>
+        <form class="singleUpdate" onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/update', this)"><input name="update" type="file" accept=".bin"><button>Send update</button></form>
       </td>
     </tr>`).join('');
 }
