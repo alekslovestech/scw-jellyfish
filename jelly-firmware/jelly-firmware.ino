@@ -31,7 +31,7 @@ HX711 scale;
 float calibration_factor = -14850;
 bool hasScale = false;
 bool isJelly = false;
-String currentPattern = "demo";   // "heartbeat" | "demo" | "ripple" | "fireSpread" | "waterfall" | "twoToneDiffuse"
+String currentPattern = "demo";   // heartbeat | demo | ripple | fireSpread | waterfall | twoToneDiffuse | fallingRain | movementSimulation | innerSpreadWave | rainbowWave
 
 // Defined here (concatenated first) so fireSpread.ino sees them — variables, unlike
 // functions, are not auto-prototyped across the sketch's alphabetical tab order.

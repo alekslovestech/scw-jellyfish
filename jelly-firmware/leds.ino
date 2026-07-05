@@ -88,6 +88,14 @@ void drawFrame() {
       waterfall();
     } else if (currentPattern == "twoToneDiffuse") {
       twoToneDiffuse();
+    } else if (currentPattern == "fallingRain") {
+      fallingRain();
+    } else if (currentPattern == "movementSimulation") {
+      movementSimulation();
+    } else if (currentPattern == "innerSpreadWave") {
+      innerSpreadWave();
+    } else if (currentPattern == "rainbowWave") {
+      rainbowWave();
     } else {                 // "heartbeat" (default)
       //heartbeat();
       if (millis() - lastHeartbeatPacketMs < 3000) {
