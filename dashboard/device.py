@@ -30,7 +30,7 @@ class Device:
     status_error: str = ""
     has_scale: bool = False
     is_jelly: bool = False
-    pattern: str = "heartbeat"
+    pattern: str = "demo"
     posX: float = 0.0
     posY: float = 0.0
     posZ: float = 0.0
