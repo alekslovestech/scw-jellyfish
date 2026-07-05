@@ -1,3 +1,5 @@
+#include "config.h"
+
 // innerSpreadWave — ported from visualizer-ts/src/animations/innerSpreadWave.ts.
 //
 // A traveling sinusoidal "worm" runs along the inner -> bell -> outer path. Inner

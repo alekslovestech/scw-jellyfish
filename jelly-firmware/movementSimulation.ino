@@ -1,3 +1,5 @@
+#include "config.h"
+
 // movementSimulation — adapted from visualizer-ts/src/animations/movementSimulation.ts.
 //
 // A green "extend / retract" pulse that simulates a jellyfish moving. Driven by

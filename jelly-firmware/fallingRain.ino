@@ -1,3 +1,5 @@
+#include "config.h"
+
 // fallingRain — ported from visualizer-ts/src/animations/fallingRain.ts.
 //
 // Each strip (s) is one independent rain column with NUM_DROPS drops falling at

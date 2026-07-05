@@ -1,3 +1,5 @@
+#include "config.h"
+
 // rainbowWave — ported from visualizer-ts/src/animations/rainbowWave.ts.
 //
 // Hue varies by arm angle (radial rainbow) and flows along each tentacle, with a
