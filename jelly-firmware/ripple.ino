@@ -1,3 +1,5 @@
+#include "config.h"
+
 // Three ripples between x = -2 and x = 2. Center wave the biggest. Value range 0..256
 float ripple(float x) {
     if (x <= -2.0f || x >= 2.0f) return 0.0f;

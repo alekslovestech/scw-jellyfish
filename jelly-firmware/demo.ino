@@ -1,3 +1,5 @@
+#include "config.h"
+
 // Demo pattern — a distinct solid colour per strip, for wiring/identification.
 void demo() {
   fillStrip(strips[0], RgbColor(MAX_BRIGHTNESS, 0, 0));     // red

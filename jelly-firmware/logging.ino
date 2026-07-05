@@ -1,5 +1,7 @@
 
 
+#include "config.h"
+
 // Global log buffer
 String serialLog;
 
