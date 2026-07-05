@@ -233,13 +233,23 @@ async def api_pattern(key: str, pattern: str = Form(...)):
     if isinstance(d, JSONResponse):
         return d
 
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
-        r = await client.post(f"{d.base_url}/pattern", data={"pattern": pattern})
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
+            r = await client.post(f"{d.base_url}/pattern", data={"pattern": pattern})
+    except Exception as e:
+        # Device unreachable / timed out — don't 500, and leave d.pattern untouched.
+        return {"ok": False, "error": str(e)}
 
-    if r.status_code < 300:
-        d.pattern = pattern
+    ok = r.status_code < 300
+    if ok:
+        # The device echoes its resulting pattern; trust that as the source of truth
+        # rather than the value we sent.
+        try:
+            d.pattern = r.json().get("pattern", pattern)
+        except Exception:
+            d.pattern = pattern
 
-    return {"ok": r.status_code < 300, "http": r.status_code, "body": r.text[:200]}
+    return {"ok": ok, "http": r.status_code, "body": r.text[:200]}
 
 
 @app.post("/api/device/{key}/position", response_model=None)

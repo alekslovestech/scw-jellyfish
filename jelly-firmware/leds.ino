@@ -22,6 +22,41 @@ float distanceFast(const Pos3D& pos1, const Pos3D& pos2) {
   return sqrtf(distanceSQ);
 }
 
+// ── Shared helpers for the ported visualizer animations ─────────────────────
+// (fireSpread / waterfall / twoToneDiffuse). FS_* segment consts live in config.h;
+// _jellyId / _fireStartTime live in jelly-firmware.ino so they precede fireSpread.ino
+// in the sketch's alphabetical tab concatenation.
+
+float fsClamp01(float x) {
+  return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
+}
+
+uint8_t fsToByte(float v) {
+  if (v <= 0.0f) return 0;
+  if (v >= 255.0f) return 255;
+  return (uint8_t)(v + 0.5f);
+}
+
+void fsSegmentForPos(int p, int* seg, float* t) {
+  if (p < FS_INNER_LEDS) {
+    *seg = FS_SEG_INNER; *t = p / (float)(FS_INNER_LEDS - 1);
+  } else if (p < FS_INNER_LEDS + FS_BELL_LEDS) {
+    *seg = FS_SEG_BELL; *t = (p - FS_INNER_LEDS) / (float)(FS_BELL_LEDS - 1);
+  } else {
+    *seg = FS_SEG_OUTER; *t = (p - FS_INNER_LEDS - FS_BELL_LEDS) / (float)(FS_OUTER_LEDS - 1);
+  }
+}
+
+// Smooth 0..1 inner->outer blend, eased across the inner/bell boundary so a
+// slightly-off physical tentacle length never shows a hard-cut seam.
+float fsInnerOuterMix(int p) {
+  const int TRANSITION_HALF = 3;
+  float edge0 = FS_INNER_LEDS - TRANSITION_HALF;
+  float edge1 = FS_INNER_LEDS + TRANSITION_HALF;
+  float x = fsClamp01((p - edge0) / (edge1 - edge0));
+  return x * x * (3.0f - 2.0f * x); // smoothstep
+}
+
 //Fundamental fuctions - entry point:
 void ledsTick() {
   if (millis() - _lastLedTime > UPDATE_INTERVAL_MS) {
@@ -47,6 +82,12 @@ void drawFrame() {
       bottomFill();
     } else if (currentPattern == "sensordemo") {
       sensorDemo();
+    } else if (currentPattern == "fireSpread") {
+      fireSpread();
+    } else if (currentPattern == "waterfall") {
+      waterfall();
+    } else if (currentPattern == "twoToneDiffuse") {
+      twoToneDiffuse();
     } else {                 // "heartbeat" (default)
       //heartbeat();
       if (millis() - lastHeartbeatPacketMs < 3000) {

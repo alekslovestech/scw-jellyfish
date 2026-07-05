@@ -31,8 +31,13 @@ HX711 scale;
 float calibration_factor = -14850;
 bool hasScale = false;
 bool isJelly = false;
-String currentPattern = "heartbeat";   // heartbeat | demo | ripple | colorwheel | bottomfill | sensordemo
-int _ledFrame = 0;                     // shared animation frame counter
+String currentPattern = "demo";   // "heartbeat" | "demo" | "ripple" | "fireSpread" | "waterfall" | "twoToneDiffuse"
+
+// Defined here (concatenated first) so fireSpread.ino sees them — variables, unlike
+// functions, are not auto-prototyped across the sketch's alphabetical tab order.
+int   _ledFrame = 0;          // shared animation frame counter
+int   _jellyId = 0;           // which jellyfish this device renders (0 = hero, ignites first)
+float _fireStartTime = -1.0f; // fireSpread ignition clock
 
 struct Pos2D {
   float x;
@@ -147,7 +152,7 @@ void loadDeviceConfig() {
   prefs.begin("config", false);
   hasScale = prefs.getBool("hasScale", false);
   isJelly  = prefs.getBool("isJelly", false);
-  currentPattern = prefs.getString("pattern", "heartbeat");
+  currentPattern = prefs.getString("pattern", "demo");
   devicePos.x = prefs.getFloat("posX", 0.0);
   devicePos.y = prefs.getFloat("posY", 0.0);
   devicePos.z = prefs.getFloat("posZ", 0.0);
