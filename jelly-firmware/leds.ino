@@ -22,9 +22,6 @@ float distanceFast(const Pos3D& pos1, const Pos3D& pos2) {
   return sqrtf(distanceSQ);
 }
 
-const uint8_t MAX_BRIGHTNESS = 128; //0-255
-const float UPDATE_INTERVAL_MS = 10;
-
 //Fundamental fuctions - entry point:
 void ledsTick() {
   if (millis() - _lastLedTime > UPDATE_INTERVAL_MS) {
@@ -35,16 +32,20 @@ void ledsTick() {
 
 void drawFrame() {
   if (isJelly) {
-    if (millis() - lastHeartbeatPacketMs < 3000) {
-      heartbeat();
-    } 
-    else {
+    if (currentPattern == "demo") {
+      demo();
+    } else if (currentPattern == "ripple") {
       if (_ledFrame%900==0) {
         point.x = random(-200,200)/100.0f;
         point.y = random(-200,50)/100.0f;
         point.z = random(-200,200)/100.0f;
       }
       rippleOutFromPoint(point, _ledFrame%900, RgbColor(255,255,0));
+    } else {                 // "heartbeat" (default)
+      //heartbeat();
+      if (millis() - lastHeartbeatPacketMs < 3000) {
+        heartbeat();
+      } 
     }
   } else {
     showColorWheelAcrossEightStrips();
@@ -86,37 +87,6 @@ void sensorDemo() {
   };
 }
 
-void heartbeat() {
-  // Fade out if no heartbeat packets have arrived recently
-  if (millis() - lastHeartbeatPacketMs > 1000) {
-    heartbeatLevel *= 0.96;
-  }
-
-  float brightness = (heartbeatLevel * 255);
-
-  Pos3D startPoint = {0.0f, -0.3f, 0.0f};
-  float distanceSQ = 0.0f;
-  float distance = 0.0f;
-  
-  for (int s = 0; s < 8; s++) {
-    for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
-      distance = distanceFast(startPoint, ledPos[s][p]);
-      strips[s].SetPixelColor(p, RgbColor(max(0.0f,brightness-500*max(distance-0.1f,0.0f)),0,0));
-    }
-  }
-}
-
-void rippleOutFromPoint(struct Pos3D& startPoint, int frame, RgbColor rgb) {
-  float distance;
-  for (int s = 0; s < 8; s++) {
-    for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
-      distance = distanceFast(startPoint, ledPos[s][p]);
-      float r = ripple(frame/20.0f-distance*10.0f-2.0f);
-      strips[s].SetPixelColor(p, RgbColor((uint8_t)(r*rgb.R),(uint8_t)(r*rgb.G),(uint8_t)(r*rgb.B)));
-    }
-  }
-}
-
 // Fill from bottom
 void bottomFill() {
   constexpr uint8_t WHEEL_STRIPS = 8;
@@ -131,21 +101,6 @@ void bottomFill() {
   for (int s = 0; s < NUM_STRIPS; s++) {
     strips[s].Show();
   };
-}
-
-// Different colors for different strips
-void demo() {
-  fillStrip(strips[0], RgbColor(MAX_BRIGHTNESS, 0, 0));     // red
-  fillStrip(strips[1], RgbColor(0, MAX_BRIGHTNESS, 0));     // green
-  fillStrip(strips[2], RgbColor(0, 0, MAX_BRIGHTNESS));     // blue
-  fillStrip(strips[3], RgbColor(MAX_BRIGHTNESS, MAX_BRIGHTNESS, 0));   // yellow
-  fillStrip(strips[4], RgbColor(0, MAX_BRIGHTNESS, MAX_BRIGHTNESS));   // cyan
-  fillStrip(strips[5], RgbColor(MAX_BRIGHTNESS, 0, MAX_BRIGHTNESS));   // magenta
-  fillStrip(strips[6], RgbColor(MAX_BRIGHTNESS, MAX_BRIGHTNESS/2, 0));   // orange
-  fillStrip(strips[7], RgbColor(MAX_BRIGHTNESS/2, 0, MAX_BRIGHTNESS));   // purple
-  for (int i=0; i<8; i++) {
-    strips[i].Show();
-  }  
 }
 
 // Rotating rainbow
@@ -254,13 +209,6 @@ struct Pos3D smallJellyFind3Dpos(int p, int s) {
   pos.z = sin(PI*s/4.0)*pos2D.x;
 
   return pos;
-}
-
-// Three ripples between x = -2 and x = 2. Center wave the biggest. Value range 0..256 
-float ripple(float x) {
-    if (x <= -2.0f || x >= 2.0f) return 0.0f;
-    float x2 = x * x;
-    return 16.0f * (x2 - 4.0f) * (x2 - 4.0f) * (x2 - 1.0f) * (x2 - 1.0f);
 }
 
 // Full color on one strip

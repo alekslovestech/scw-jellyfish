@@ -70,8 +70,6 @@ void logPrintln(const T &value) {
     trimLog();
 }
 
-const size_t MAX_LOG_SIZE = 4096;
-
 void trimLog() {
     if (serialLog.length() > MAX_LOG_SIZE) {
         serialLog.remove(0, serialLog.length() - MAX_LOG_SIZE);

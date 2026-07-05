@@ -4,8 +4,6 @@
 
 WiFiUDP udp;
 WiFiUDP scaleUdp;
-const int MUSIC_UDP_PORT = 4210;
-const int SCALE_UDP_PORT = 4211;
 
 String lastSendStatus = "Ready";
 bool hasReceivedNumber = false;
@@ -23,8 +21,6 @@ WifiCredential wifiList[] = {
 };
 
 const int WIFI_COUNT = sizeof(wifiList) / sizeof(wifiList[0]);
-const unsigned long WIFI_CONNECT_TIMEOUT_MS = 5000;
-const unsigned long WIFI_RETRY_INTERVAL_MS  = 1000000;
 
 String currentSSID = "";
 
@@ -288,6 +284,7 @@ void handleStatus() {
   //json += "\"number\":" + String(_agitation) + ",";
   json += "\"hasScale\":" + String(hasScale ? "true" : "false") + ",";
   json += "\"isJelly\":" + String(isJelly ? "true" : "false") + ",";
+  json += "\"pattern\":\"" + currentPattern + "\",";
   //json += "\"hasNumber\":" + String(hasReceivedNumber ? "true" : "false");
   json += "\"posX\":" + String(devicePos.x) + ",";
   json += "\"posY\":" + String(devicePos.y) + ",";
@@ -363,6 +360,18 @@ void handleConfig() {
   );
 }
 
+void handlePattern() {
+  if (!server.hasArg("pattern")) {
+    server.send(400, "application/json", "{\"ok\":false,\"error\":\"Missing 'pattern' field\"}");
+    return;
+  }
+  savePattern(server.arg("pattern"));
+  logPrint("Changed pattern to: ");
+  logPrintln(currentPattern);
+  server.send(200, "application/json",
+    String("{\"ok\":true,\"pattern\":\"") + currentPattern + "\"}");
+}
+
 void handlePosition() {
   struct Pos3D newPos = devicePos;
 
@@ -399,6 +408,7 @@ void setupWebServer() {
   server.on("/log", HTTP_GET, handleLog);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/config", HTTP_POST, handleConfig);
+  server.on("/pattern", HTTP_POST, handlePattern);
 
   server.on("/update", HTTP_POST, []() {
     bool ok = !Update.hasError();

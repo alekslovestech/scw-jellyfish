@@ -7,6 +7,7 @@
 #include <math.h>
 #include <Arduino.h>
 #include "version.h"
+#include "config.h"
 #include <array>
 #include "HX711.h"
 
@@ -27,15 +28,10 @@ float heartbeatPhase = 0.0;
 unsigned long lastHeartbeatPacketMs = 0;
 
 HX711 scale;
-const int HX711_DOUT = 14;
-const int HX711_SCK  = 13;
 float calibration_factor = -14850;
-constexpr unsigned long HX711_READY_TIMEOUT_MS = 1500;
 bool hasScale = false;
 bool isJelly = false;
-
-constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
-constexpr uint16_t NUM_STRIPS = 12;
+String currentPattern = "heartbeat";   // "heartbeat" | "demo" | "ripple"
 
 struct Pos2D {
   float x;
@@ -150,6 +146,7 @@ void loadDeviceConfig() {
   prefs.begin("config", false);
   hasScale = prefs.getBool("hasScale", false);
   isJelly  = prefs.getBool("isJelly", false);
+  currentPattern = prefs.getString("pattern", "heartbeat");
   devicePos.x = prefs.getFloat("posX", 0.0);
   devicePos.y = prefs.getFloat("posY", 0.0);
   devicePos.z = prefs.getFloat("posZ", 0.0);
@@ -164,6 +161,13 @@ void saveDeviceConfig(bool newHasScale, bool newIsJelly) {
 
   hasScale = newHasScale;
   isJelly = newIsJelly;
+}
+
+void savePattern(const String& p) {
+  prefs.begin("config", false);
+  prefs.putString("pattern", p);
+  prefs.end();
+  currentPattern = p;
 }
 
 void saveDevicePos(Pos3D pos) {

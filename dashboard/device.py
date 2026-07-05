@@ -30,6 +30,7 @@ class Device:
     status_error: str = ""
     has_scale: bool = False
     is_jelly: bool = False
+    pattern: str = "heartbeat"
     posX: float = 0.0
     posY: float = 0.0
     posZ: float = 0.0
@@ -60,6 +61,7 @@ class Device:
             "statusError": self.status_error,
             "hasScale": self.has_scale,
             "isJelly": self.is_jelly,
+            "pattern": self.pattern,
             "posX": self.posX,
             "posY": self.posY,
             "posZ": self.posZ,

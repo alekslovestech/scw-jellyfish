@@ -138,6 +138,7 @@ async def poll_device(client: httpx.AsyncClient, d: Device) -> None:
         d.ssid = data.get("ssid", d.ssid)
         d.has_scale = bool(data.get("hasScale", d.has_scale))
         d.is_jelly = bool(data.get("isJelly", d.is_jelly))
+        d.pattern = data.get("pattern", d.pattern)
         d.posX = float(data.get("posX", d.posX))
         d.posY = float(data.get("posX", d.posY))
         d.posZ = float(data.get("posX", d.posZ))
@@ -225,6 +226,20 @@ async def api_config(
     if r.status_code < 300:
         d.has_scale = hasScale
         d.is_jelly = isJelly
+
+    return {"ok": r.status_code < 300, "http": r.status_code, "body": r.text[:200]}
+
+@app.post("/api/device/{key}/pattern", response_model=None)
+async def api_pattern(key: str, pattern: str = Form(...)):
+    d = get_device_or_404(key)
+    if isinstance(d, JSONResponse):
+        return d
+
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
+        r = await client.post(f"{d.base_url}/pattern", data={"pattern": pattern})
+
+    if r.status_code < 300:
+        d.pattern = pattern
 
     return {"ok": r.status_code < 300, "http": r.status_code, "body": r.text[:200]}
 
@@ -411,6 +426,15 @@ async function refresh(force=false){
             <label><input type="checkbox" name="hasScale" ${d.hasScale ? 'checked' : ''}> Scale</label>
             <label><input type="checkbox" name="isJelly" ${d.isJelly ? 'checked' : ''}> Jelly</label>
             <button>Save config</button>
+          </form>
+          <form onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/pattern', this)">
+            <label>Pattern
+              <select name="pattern" onchange="this.form.requestSubmit()">
+                <option value="heartbeat" ${d.pattern === 'heartbeat' ? 'selected' : ''}>Heartbeat</option>
+                <option value="demo" ${d.pattern === 'demo' ? 'selected' : ''}>Demo</option>
+                <option value="ripple" ${d.pattern === 'ripple' ? 'selected' : ''}>Ripple effect</option>
+              </select>
+            </label>
           </form>
         <button onclick="fetch('/api/device/${encodeURIComponent(d.key)}/identify',{method:'POST'}).then(r=>r.json()).then(x=>{log.textContent=JSON.stringify(x,null,2); refresh();})">Blink</button>
         <button data-key="${esc(d.key)}" data-name="${esc(d.name)}" onclick="openDeviceLog(this.dataset.key, this.dataset.name)">Log</button>
