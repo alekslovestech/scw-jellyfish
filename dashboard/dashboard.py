@@ -377,6 +377,26 @@ const renameDrafts = new Map();
 
 function esc(s){return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
+// Pattern menu — single source of truth. Add [value, label] here and the dropdown follows.
+const PATTERNS = [
+  ['heartbeat', 'Heartbeat'],
+  ['demo', 'Demo'],
+  ['ripple', 'Ripple effect'],
+  ['fireSpread', 'Fire spread'],
+  ['waterfall', 'Waterfall'],
+  ['twoToneDiffuse', 'Two-tone diffuse'],
+  ['colorwheel', 'Color wheel'],
+  ['bottomfill', 'Bottom fill'],
+  ['sensordemo', 'Sensor demo'],
+];
+
+function patternSelect(current){
+  const options = PATTERNS.map(([value, label]) =>
+    `<option value="${value}"${value === current ? ' selected' : ''}>${esc(label)}</option>`
+  ).join('');
+  return `<select name="pattern" onchange="this.form.requestSubmit()">${options}</select>`;
+}
+
 function tableHasActiveFormState(){
   // The table is rebuilt on each refresh. Avoid destroying user input while a
   // single-device form is being edited, especially file inputs, which browsers
@@ -463,17 +483,7 @@ async function refresh(force=false){
           </form>
           <form onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/pattern', this)">
             <label>Pattern
-              <select name="pattern" onchange="this.form.requestSubmit()">
-                <option value="heartbeat" ${d.pattern === 'heartbeat' ? 'selected' : ''}>Heartbeat</option>
-                <option value="demo" ${d.pattern === 'demo' ? 'selected' : ''}>Demo</option>
-                <option value="ripple" ${d.pattern === 'ripple' ? 'selected' : ''}>Ripple effect</option>
-                <option value="fireSpread" ${d.pattern === 'fireSpread' ? 'selected' : ''}>Fire spread</option>
-                <option value="waterfall" ${d.pattern === 'waterfall' ? 'selected' : ''}>Waterfall</option>
-                <option value="twoToneDiffuse" ${d.pattern === 'twoToneDiffuse' ? 'selected' : ''}>Two-tone diffuse</option>
-                <option value="colorwheel" ${d.pattern === 'colorwheel' ? 'selected' : ''}>Color wheel</option>
-                <option value="bottomfill" ${d.pattern === 'bottomfill' ? 'selected' : ''}>Bottom fill</option>
-                <option value="sensordemo" ${d.pattern === 'sensordemo' ? 'selected' : ''}>Sensor demo</option>
-              </select>
+              ${patternSelect(d.pattern)}
             </label>
           </form>
         <button onclick="fetch('/api/device/${encodeURIComponent(d.key)}/identify',{method:'POST'}).then(r=>r.json()).then(x=>{log.textContent=JSON.stringify(x,null,2); refresh();})">Blink</button>
