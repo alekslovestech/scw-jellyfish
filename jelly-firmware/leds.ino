@@ -9,30 +9,31 @@ float _calmness = 0;
 float _wavePhase = 0;
 
 struct Pos3D point;
-//struct Pos3D point2;
-//struct Pos3D point3;
+
+float distanceSquared(const Pos3D& pos1, const Pos3D& pos2) {
+  float dx = pos1.x - pos2.x;
+  float dy = pos1.y - pos2.y;
+  float dz = pos1.z - pos2.z; 
+  return dx*dx + dy*dy + dz*dz;
+}
+
+float distanceFast(const Pos3D& pos1, const Pos3D& pos2) {
+  float distanceSQ = distanceSquared(pos1, pos2);
+  return sqrtf(distanceSQ);
+}
 
 const uint8_t MAX_BRIGHTNESS = 128; //0-255
+const float UPDATE_INTERVAL_MS = 10;
 
 //Fundamental fuctions - entry point:
 void ledsTick() {
-  if (millis() - _lastLedTime > 10) {
+  if (millis() - _lastLedTime > UPDATE_INTERVAL_MS) {
     _lastLedTime = millis();
     drawFrame();
   }
-  //logPrintln("Ticking, time elapsed: ");
-  //logPrint(millis()- _lastLedTime);
 }
 
 void drawFrame() {
-  //bottomFill();
-  /*struct Pos3D start;
-  start.x = -1.0f;
-  start.y = 0.0f;
-  start.z = 0.2f;
-  */
-
-
   if (isJelly) {
     if (millis() - lastHeartbeatPacketMs < 3000) {
       heartbeat();
@@ -43,24 +44,11 @@ void drawFrame() {
         point.y = random(-200,50)/100.0f;
         point.z = random(-200,200)/100.0f;
       }
-      rippleOutFromPoint(point, _ledFrame%900);
+      rippleOutFromPoint(point, _ledFrame%900, RgbColor(255,255,0));
     }
   } else {
     showColorWheelAcrossEightStrips();
   }
-  /*if (_ledFrame%900==300) {
-    point2.x = random(-200,200)/100.0f;
-    point2.y = random(-200,50)/100.0f;
-    point2.z = random(-200,200)/100.0f;
-  }
-  if (_ledFrame%900==600) {
-    point3.x = random(-200,200)/100.0f;
-    point3.y = random(-200,50)/100.0f;
-    point3.z = random(-200,200)/100.0f;
-  }*/
-
-  //rippleOutFromPoint(point2, (_ledFrame+300)%900);
-  //rippleOutFromPoint(point3, (_ledFrame+600)%900);
   showLEDs();
   if (hasScale && scale.is_ready()) {
     _weight = scale.get_units(1);  
@@ -106,32 +94,25 @@ void heartbeat() {
 
   float brightness = (heartbeatLevel * 255);
 
-  struct Pos3D startPoint;
-  startPoint.x = 0.0f;
-  startPoint.y = -0.3f;
-  startPoint.z = 0.0f;
+  Pos3D startPoint = {0.0f, -0.3f, 0.0f};
   float distanceSQ = 0.0f;
   float distance = 0.0f;
   
   for (int s = 0; s < 8; s++) {
     for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
-      distanceSQ = (startPoint.x-ledPos[s][p].x)*(startPoint.x-ledPos[s][p].x)+(startPoint.y-ledPos[s][p].y)*(startPoint.y-ledPos[s][p].y)+(startPoint.z-ledPos[s][p].z)*(startPoint.z-ledPos[s][p].z);
-      distance = sqrtf(distanceSQ);
+      distance = distanceFast(startPoint, ledPos[s][p]);
       strips[s].SetPixelColor(p, RgbColor(max(0.0f,brightness-500*max(distance-0.1f,0.0f)),0,0));
     }
   }
-
 }
 
-void rippleOutFromPoint(struct Pos3D startPoint, int frame) {
-  float distanceSQ;
+void rippleOutFromPoint(struct Pos3D& startPoint, int frame, RgbColor rgb) {
   float distance;
-  //int frameSQ = frame*frame;
   for (int s = 0; s < 8; s++) {
     for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
-      distanceSQ = (startPoint.x-ledPos[s][p].x)*(startPoint.x-ledPos[s][p].x)+(startPoint.y-ledPos[s][p].y)*(startPoint.y-ledPos[s][p].y)+(startPoint.z-ledPos[s][p].z)*(startPoint.z-ledPos[s][p].z);
-      distance = sqrtf(distanceSQ);
-      strips[s].SetPixelColor(p, RgbColor(0,0,ripple(frame/20.0f-distance*10.0f-2.0f)));
+      distance = distanceFast(startPoint, ledPos[s][p]);
+      float r = ripple(frame/20.0f-distance*10.0f-2.0f);
+      strips[s].SetPixelColor(p, RgbColor((uint8_t)(r*rgb.R),(uint8_t)(r*rgb.G),(uint8_t)(r*rgb.B)));
     }
   }
 }
@@ -190,9 +171,6 @@ void showColorWheelAcrossEightStrips()
     uint8_t stripOffset = (uint8_t)((s * 256) / WHEEL_STRIPS);
 
     for (uint16_t i = 0; i < NUM_LEDS_PER_STRIP; ++i) {
-      // Spread each strip across the full wheel
-      //if (i % 5 != 0)
-      //  continue;
       uint8_t ledHue = (uint8_t)((i * 256) / NUM_LEDS_PER_STRIP);
 
       // Combine strip offset + position + slow animation
@@ -284,7 +262,6 @@ float ripple(float x) {
     float x2 = x * x;
     return 16.0f * (x2 - 4.0f) * (x2 - 4.0f) * (x2 - 1.0f) * (x2 - 1.0f);
 }
-
 
 // Full color on one strip
 void fillStrip(StripBus& strip, RgbColor c) {
