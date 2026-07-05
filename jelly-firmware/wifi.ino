@@ -1,6 +1,7 @@
 #include <HTTPClient.h>
 #include <esp_wifi.h>
 #include <WiFiUdp.h>
+#include "config.h"
 
 WiFiUDP udp;
 WiFiUDP scaleUdp;

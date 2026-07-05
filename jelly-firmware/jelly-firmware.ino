@@ -31,7 +31,8 @@ HX711 scale;
 float calibration_factor = -14850;
 bool hasScale = false;
 bool isJelly = false;
-String currentPattern = "heartbeat";   // "heartbeat" | "demo" | "ripple"
+String currentPattern = "heartbeat";   // heartbeat | demo | ripple | colorwheel | bottomfill | sensordemo
+int _ledFrame = 0;                     // shared animation frame counter
 
 struct Pos2D {
   float x;

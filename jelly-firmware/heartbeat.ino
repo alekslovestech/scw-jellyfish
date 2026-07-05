@@ -1,3 +1,5 @@
+#include "config.h"
+
 // Heartbeat pattern — renders the externally driven `heartbeatLevel` as a red
 // pulse radiating from the bell centre. Level is set by incoming UDP packets
 // (see wifi.ino); with no packets it fades toward zero.
