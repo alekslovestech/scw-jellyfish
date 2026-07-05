@@ -470,6 +470,10 @@ async function refresh(force=false){
                 <option value="fireSpread" ${d.pattern === 'fireSpread' ? 'selected' : ''}>Fire spread</option>
                 <option value="waterfall" ${d.pattern === 'waterfall' ? 'selected' : ''}>Waterfall</option>
                 <option value="twoToneDiffuse" ${d.pattern === 'twoToneDiffuse' ? 'selected' : ''}>Two-tone diffuse</option>
+                <option value="fallingRain" ${d.pattern === 'fallingRain' ? 'selected' : ''}>Falling rain</option>
+                <option value="movementSimulation" ${d.pattern === 'movementSimulation' ? 'selected' : ''}>Movement simulation</option>
+                <option value="innerSpreadWave" ${d.pattern === 'innerSpreadWave' ? 'selected' : ''}>Inner spread wave</option>
+                <option value="rainbowWave" ${d.pattern === 'rainbowWave' ? 'selected' : ''}>Rainbow wave</option>
               </select>
             </label>
           </form>
