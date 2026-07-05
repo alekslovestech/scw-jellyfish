@@ -11,14 +11,17 @@ import asyncio
 import socket
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
 from device import DEVICE_TIMEOUT_SECONDS, Device
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 SERVICE_TYPE = "_esp32art._tcp.local."
 POLL_INTERVAL_SECONDS = 2.0
@@ -157,8 +160,8 @@ def get_device_or_404(key: str) -> Device | JSONResponse:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index() -> str:
-    return DASHBOARD_HTML
+async def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/api/devices")
@@ -328,192 +331,6 @@ async def api_broadcast_update(update: UploadFile = File(...)) -> dict[str, Any]
                 results.append({"name": d.name, "ok": False, "error": str(e)})
     return {"results": results}
 
-
-DASHBOARD_HTML = r"""
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ESP32 Fleet Dashboard</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;margin:24px;background:#fafafa;color:#111}
-    h1{margin-bottom:6px}.muted{color:#666}.bar{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:18px 0}
-    input,button{font:inherit;padding:8px 10px;border:1px solid #ccc;border-radius:8px;background:white}button{cursor:pointer}
-    table{border-collapse:collapse;width:100%;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px #0001}
-    th,td{text-align:left;padding:10px;border-bottom:1px solid #eee;vertical-align:middle}th{background:#f0f0f0}
-    .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px}.on{background:#19a34a}.off{background:#c22}
-    .actions{display:flex;gap:6px;flex-wrap:wrap}.actions form{display:inline-flex;gap:6px;align-items:center}.small{width:90px}.name{width:140px}.loc{width:72px}.locationForm{display:flex;gap:6px;align-items:end;flex-wrap:wrap}.locationForm label{font-size:12px;color:#555}.locationForm input{display:block;margin-top:2px}.log{white-space:pre-wrap;background:#111;color:#eee;padding:12px;border-radius:8px;min-height:40px}.deviceLog{max-height:420px;overflow:auto}.panel{margin-top:20px;background:white;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}.hidden{display:none}.rowbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-  </style>
-</head>
-<body>
-  <h1>ESP32 Fleet Dashboard</h1>
-  <div class="muted">Auto-refreshes every 2 seconds using mDNS + HTTP.</div>
-
-  <div class="bar">
-    <form id="broadcastNumber"><label>Broadcast number<br><input name="value" type="number" step="any" value="123"></label><button>Send to all</button></form>
-    <form id="broadcastUpdate"><label>OTA all, sequential<br><input name="update" type="file" accept=".bin"></label><button>Upload to all</button></form>
-  </div>
-
-  <table>
-    <thead><tr><th>Status</th><th>Name</th><th>Address</th><th>Firmware</th><th>Signal</th><th>Position</th><th>Config</th><th>Last seen</th><th>Actions</th></tr></thead>
-    <tbody id="rows"><tr><td colspan="9">Waiting for ESP32 devices...</td></tr></tbody>
-  </table>
-
-  <div id="deviceLogPanel" class="panel hidden">
-    <div class="rowbar">
-      <h3 id="deviceLogTitle" style="margin:0">Device log</h3>
-      <div>
-        <label><input id="autoLog" type="checkbox" checked> Auto-refresh</label>
-        <button onclick="refreshDeviceLog()">Refresh log</button>
-        <button onclick="closeDeviceLog()">Close</button>
-      </div>
-    </div>
-    <div id="deviceLog" class="log deviceLog"></div>
-  </div>
-
-  <h3>Result</h3><div id="log" class="log"></div>
-
-<script>
-const rows = document.getElementById('rows');
-const log = document.getElementById('log');
-const deviceLogPanel = document.getElementById('deviceLogPanel');
-const deviceLogTitle = document.getElementById('deviceLogTitle');
-const deviceLog = document.getElementById('deviceLog');
-const autoLog = document.getElementById('autoLog');
-let selectedLogKey = null;
-let selectedLogName = '';
-const renameDrafts = new Map();
-
-function esc(s){return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-
-// Pattern menu — single source of truth. Add [value, label] here and the dropdown follows.
-const PATTERNS = [
-  ['heartbeat', 'Heartbeat'],
-  ['demo', 'Demo'],
-  ['ripple', 'Ripple effect'],
-  ['fireSpread', 'Fire spread'],
-  ['waterfall', 'Waterfall'],
-  ['twoToneDiffuse', 'Two-tone diffuse'],
-  ['colorwheel', 'Color wheel'],
-  ['bottomfill', 'Bottom fill'],
-  ['sensordemo', 'Sensor demo'],
-  ['fallingRain', 'Falling rain'],
-  ['movementSimulation', 'Movement simulation'],
-  ['innerSpreadWave', 'Inner spread wave'],
-  ['rainbowWave', 'Rainbow wave'],
-];
-
-function patternSelect(current){
-  const options = PATTERNS.map(([value, label]) =>
-    `<option value="${value}"${value === current ? ' selected' : ''}>${esc(label)}</option>`
-  ).join('');
-  return `<select name="pattern" onchange="this.form.requestSubmit()">${options}</select>`;
-}
-
-function tableHasActiveFormState(){
-  // The table is rebuilt on each refresh. Avoid destroying user input while a
-  // single-device form is being edited, especially file inputs, which browsers
-  // do not allow JavaScript to restore after re-rendering.
-  const active = document.activeElement;
-  if(active && rows.contains(active) && ['INPUT','SELECT','TEXTAREA'].includes(active.tagName)) return true;
-  return Array.from(rows.querySelectorAll('input[type="file"]')).some(input => input.files && input.files.length > 0);
-}
-
-rows.addEventListener('input', e => {
-  if(e.target.matches('.renameInput')){
-    renameDrafts.set(e.target.dataset.key, e.target.value);
-  }
-});
-function signalHtml(d){
-  if(d.rssi === null || d.rssi === undefined) return '-';
-  return esc(d.rssi) + ' dBm<br><small>' + esc(d.signalQuality || '') + '</small>';
-}
-async function postForm(url, form){
-  const body = new FormData(form);
-  const r = await fetch(url, {method:'POST', body});
-  const data = await r.json().catch(() => ({}));
-  log.textContent = JSON.stringify(data, null, 2);
-
-  if(form.classList.contains('renameForm') && data.ok){
-    renameDrafts.delete(form.dataset.key);
-  }
-  if(form.classList.contains('singleUpdate') && data.ok){
-    form.reset();
-  }
-
-  refresh(true);
-}
-function openDeviceLog(key, name){
-  selectedLogKey = key;
-  selectedLogName = name;
-  deviceLogTitle.textContent = 'Device log: ' + name;
-  deviceLogPanel.classList.remove('hidden');
-  refreshDeviceLog();
-}
-function closeDeviceLog(){
-  selectedLogKey = null;
-  deviceLogPanel.classList.add('hidden');
-}
-async function refreshDeviceLog(){
-  if(!selectedLogKey) return;
-  try{
-    const data = await fetch('/api/device/' + encodeURIComponent(selectedLogKey) + '/log').then(r => r.json());
-    deviceLog.textContent = data.ok ? (data.log || '(empty log)') : JSON.stringify(data, null, 2);
-    deviceLog.scrollTop = deviceLog.scrollHeight;
-  }catch(e){
-    deviceLog.textContent = String(e);
-  }
-}
-async function refresh(force=false){
-  if(!force && tableHasActiveFormState()) return;
-  const data = await fetch('/api/devices').then(r => r.json());
-  if(!data.devices.length){ rows.innerHTML = '<tr><td colspan="9">Waiting for ESP32 devices...</td></tr>'; return; }
-  rows.innerHTML = data.devices.map(d => `
-    <tr>
-      <td><span class="dot ${d.online?'on':'off'}"></span>${d.online?'Online':'Offline'}${d.statusError ? '<br><small>'+esc(d.statusError)+'</small>' : ''}</td>
-      <td><b>${esc(d.name)}</b><br><small>${esc(d.mac || d.chip || d.key)}</small></td>
-      <td><a href="${esc(d.url)}" target="_blank">${esc(d.ip)}</a><br><small>${esc(d.host)}</small></td>
-      <td>${esc(d.firmware || '-')}<br><small>${esc(d.ssid || '')}</small></td>
-      <td>${signalHtml(d)}</td>
-      <td>
-        <form class="locationForm" onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/position', this)">
-          <label>X<input class="loc" name="posX" type="number" step="any" value="${esc(d.posX ?? 0)}"></label>
-          <label>Y<input class="loc" name="posY" type="number" step="any" value="${esc(d.posY ?? 0)}"></label>
-          <label>Z<input class="loc" name="posZ" type="number" step="any" value="${esc(d.posZ ?? 0)}"></label>
-          <button>Save</button>
-        </form>
-      </td>
-      <td>
-        Scale: ${d.hasScale ? 'yes' : 'no'}<br>
-        Jelly: ${d.isJelly ? 'yes' : 'no'}
-      </td>
-      <td>${esc(d.lastSeenAgo)}s</td>
-      <td class="actions">
-          <form onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/config', this)">
-            <label><input type="checkbox" name="hasScale" ${d.hasScale ? 'checked' : ''}> Scale</label>
-            <label><input type="checkbox" name="isJelly" ${d.isJelly ? 'checked' : ''}> Jelly</label>
-            <button>Save config</button>
-          </form>
-          <form onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/pattern', this)">
-            <label>Pattern
-              ${patternSelect(d.pattern)}
-            </label>
-          </form>
-        <button onclick="fetch('/api/device/${encodeURIComponent(d.key)}/identify',{method:'POST'}).then(r=>r.json()).then(x=>{log.textContent=JSON.stringify(x,null,2); refresh();})">Blink</button>
-        <button data-key="${esc(d.key)}" data-name="${esc(d.name)}" onclick="openDeviceLog(this.dataset.key, this.dataset.name)">Log</button>
-        <form class="renameForm" data-key="${esc(d.key)}" onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/rename', this)"><input class="name renameInput" data-key="${esc(d.key)}" name="name" value="${esc(renameDrafts.get(d.key) ?? d.name)}"><button>Rename</button></form>
-        <form class="singleUpdate" onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/update', this)"><input name="update" type="file" accept=".bin"><button>Send update</button></form>
-      </td>
-    </tr>`).join('');
-}
-document.getElementById('broadcastNumber').onsubmit = e => { e.preventDefault(); postForm('/api/broadcast/set-number', e.target); };
-document.getElementById('broadcastUpdate').onsubmit = e => { e.preventDefault(); postForm('/api/broadcast/update', e.target); };
-refresh(); setInterval(refresh, 2000); setInterval(() => { if(selectedLogKey && autoLog.checked) refreshDeviceLog(); }, 2000);
-</script>
-</body>
-</html>
-"""
 
 if __name__ == "__main__":
     import uvicorn

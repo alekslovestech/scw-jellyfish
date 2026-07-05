@@ -96,8 +96,7 @@ void drawFrame() {
       innerSpreadWave();
     } else if (currentPattern == "rainbowWave") {
       rainbowWave();
-    } else {                 // "heartbeat" (default)
-      //heartbeat();
+    } else {                
       if (millis() - lastHeartbeatPacketMs < 3000) {
         heartbeat();
       }
