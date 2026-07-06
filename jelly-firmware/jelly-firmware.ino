@@ -7,65 +7,76 @@
 #include <math.h>
 #include <Arduino.h>
 #include "version.h"
+#include "config.h"
 #include <array>
+#include "HX711.h"
 
-using StripBus = NeoPixelBus<NeoGrbFeature, NeoEsp32LcdX8Ws2812xMethod>;
 
+using StripBus = NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>;
 
-const int HX711_DOUT = 4;
-const int HX711_SCK  = 5;
-float calibration_factor = -14505;
+float musicLevel = 0.0;
+float musicBass = 0.0;
+float musicMid = 0.0;
+float musicHigh = 0.0;
+bool musicBeat = false;
 
-constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
-constexpr uint16_t NUM_STRIPS = 16;
+float heartbeatLevel = 0.0;
+bool heartbeatBeat = false;
+int heartbeatHue = 0;
+float heartbeatPhase = 0.0;
 
-constexpr uint8_t PIN0  = 4;
-constexpr uint8_t PIN1  = 5;
-constexpr uint8_t PIN2  = 6;
-constexpr uint8_t PIN3  = 7;
-constexpr uint8_t PIN4  = 8;
-constexpr uint8_t PIN5  = 9;
-constexpr uint8_t PIN6  = 10;
-constexpr uint8_t PIN7  = 11;
-constexpr uint8_t PIN8  = 12;
-constexpr uint8_t PIN9  = 13;
-constexpr uint8_t PIN10 = 14;
-constexpr uint8_t PIN11 = 15;
-constexpr uint8_t PIN12 = 16;
-constexpr uint8_t PIN13 = 17;
-constexpr uint8_t PIN14 = 18;
-constexpr uint8_t PIN15 = 21;
+unsigned long lastHeartbeatPacketMs = 0;
 
-StripBus strip0(NUM_LEDS_PER_STRIP, PIN0);
-StripBus strip1(NUM_LEDS_PER_STRIP, PIN1);
-StripBus strip2(NUM_LEDS_PER_STRIP, PIN2);
-StripBus strip3(NUM_LEDS_PER_STRIP, PIN3);
-StripBus strip4(NUM_LEDS_PER_STRIP, PIN4);
-StripBus strip5(NUM_LEDS_PER_STRIP, PIN5);
-StripBus strip6(NUM_LEDS_PER_STRIP, PIN6);
-StripBus strip7(NUM_LEDS_PER_STRIP, PIN7);
-StripBus strip8(NUM_LEDS_PER_STRIP, PIN8);
-StripBus strip9(NUM_LEDS_PER_STRIP, PIN9);
-StripBus strip10(NUM_LEDS_PER_STRIP, PIN10);
-StripBus strip11(NUM_LEDS_PER_STRIP, PIN11);
-StripBus strip12(NUM_LEDS_PER_STRIP, PIN12);
-StripBus strip13(NUM_LEDS_PER_STRIP, PIN13);
-StripBus strip14(NUM_LEDS_PER_STRIP, PIN14);
-StripBus strip15(NUM_LEDS_PER_STRIP, PIN15);
+HX711 scale;
+float calibration_factor = -14850;
+bool hasScale = false;
+bool isJelly = false;
+String currentPattern = "demo";   // heartbeat | demo | ripple | fireSpread | waterfall | twoToneDiffuse | fallingRain | movementSimulation | innerSpreadWave | rainbowWave
 
-std::array<StripBus*, NUM_STRIPS> strips = {
-  &strip0, &strip1, &strip2, &strip3,
-  &strip4, &strip5, &strip6, &strip7,
-  &strip8, &strip9, &strip10, &strip11,
-  &strip12, &strip13, &strip14, &strip15
+// Defined here (concatenated first) so fireSpread.ino sees them — variables, unlike
+// functions, are not auto-prototyped across the sketch's alphabetical tab order.
+int   _ledFrame = 0;          // shared animation frame counter
+int   _jellyId = 0;           // which jellyfish this device renders (0 = hero, ignites first)
+float _fireStartTime = -1.0f; // fireSpread ignition clock
+
+struct Pos2D {
+  float x;
+  float y;
 };
 
-template <typename Fn>
-void forEachStrip(Fn&& fn) {
-  for (auto* strip : strips) {
-    fn(*strip);
-  }
-}
+struct Pos3D {
+  float x;
+  float y;
+  float z;
+};
+
+struct Pos3D devicePos = {0.0f, 0.0f, 0.0f};
+
+//positions of (num of strips * number of leds)
+struct Pos3D ledPos[8][NUM_LEDS_PER_STRIP];
+
+
+int PINS[NUM_STRIPS] = {
+  4,5,6,7,9,10,11,12,15,16,17,18
+}; // consider skipping pin 8
+StripBus strips[] = {
+  {NUM_LEDS_PER_STRIP, PINS[0]},
+  {NUM_LEDS_PER_STRIP, PINS[1]},
+  {NUM_LEDS_PER_STRIP, PINS[2]},
+  {NUM_LEDS_PER_STRIP, PINS[3]},
+  {NUM_LEDS_PER_STRIP, PINS[4]},
+  {NUM_LEDS_PER_STRIP, PINS[5]},
+  {NUM_LEDS_PER_STRIP, PINS[6]},
+  {NUM_LEDS_PER_STRIP, PINS[7]},
+  {NUM_LEDS_PER_STRIP, PINS[8]},
+  {NUM_LEDS_PER_STRIP, PINS[9]},
+  {NUM_LEDS_PER_STRIP, PINS[10]},
+  {NUM_LEDS_PER_STRIP, PINS[11]},
+ // {NUM_LEDS_PER_STRIP, PINS[12]},
+ // {NUM_LEDS_PER_STRIP, PINS[13]},
+ // {NUM_LEDS_PER_STRIP, PINS[14]},
+ // {NUM_LEDS_PER_STRIP, PINS[15]},
+};
 
 WebServer server(80);
 Preferences prefs;
@@ -137,6 +148,76 @@ void saveDeviceName(const String& newName) {
   deviceName = cleaned;
 }
 
+void loadDeviceConfig() {
+  prefs.begin("config", false);
+  hasScale = prefs.getBool("hasScale", false);
+  isJelly  = prefs.getBool("isJelly", false);
+  currentPattern = prefs.getString("pattern", "demo");
+  devicePos.x = prefs.getFloat("posX", 0.0);
+  devicePos.y = prefs.getFloat("posY", 0.0);
+  devicePos.z = prefs.getFloat("posZ", 0.0);
+  prefs.end();
+}
+
+void saveDeviceConfig(bool newHasScale, bool newIsJelly) {
+  prefs.begin("config", false);
+  prefs.putBool("hasScale", newHasScale);
+  prefs.putBool("isJelly", newIsJelly);
+  prefs.end();
+
+  hasScale = newHasScale;
+  isJelly = newIsJelly;
+}
+
+void savePattern(const String& p) {
+  prefs.begin("config", false);
+  prefs.putString("pattern", p);
+  prefs.end();
+  currentPattern = p;
+}
+
+void saveDevicePos(Pos3D pos) {
+  prefs.begin("config", false);
+
+  prefs.putFloat("posX", pos.x);
+  prefs.putFloat("posY", pos.y);
+  prefs.putFloat("posZ", pos.z);
+
+  prefs.end();
+
+  devicePos = pos;
+}
+
+bool initScaleWithTimeout(unsigned long timeoutMs) {
+  scale.begin(HX711_DOUT, HX711_SCK);
+
+  unsigned long start = millis();
+  while (!scale.is_ready()) {
+    if (millis() - start >= timeoutMs) {
+      logPrintln("HX711 not ready. Disabling scale for this boot.");
+      return false;
+    }
+
+    // Keep Wi-Fi/web server responsive while waiting.
+    if (webServerStarted && WiFi.status() == WL_CONNECTED) {
+      server.handleClient();
+    }
+
+    delay(10);
+  }
+
+  scale.set_scale(calibration_factor);
+
+  logPrintln("HX711 ready. Taring scale...");
+
+  // HX711 library tare() can block because it reads multiple samples.
+  // Since is_ready() succeeded, this should usually be safe, but keep reads low.
+  scale.tare(3);
+
+  logPrintln("Scale initialized.");
+  return true;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 void setup() {
@@ -144,27 +225,63 @@ void setup() {
   delay(200);
 
   loadIdentity();
-  
-  forEachStrip([](StripBus& strip) {
-    strip.Begin();
-    strip.Show();   // optional, but often useful to start with LEDs off
-  });
+  loadDeviceConfig();
+
+  logPrint("Config hasScale: ");
+  logPrintln(hasScale ? "true" : "false");
+
+  logPrint("Config isJelly: ");
+  logPrintln(isJelly ? "true" : "false");
+
+  logPrint("Device position: ");
+  logPrint(devicePos.x);
+  logPrint(", ");
+  logPrint(devicePos.y);
+  logPrint(", ");
+  logPrintln(devicePos.z);
+
+
+  for (int i=0; i<NUM_STRIPS; i++) {
+    strips[i].Begin();
+    strips[i].Show();
+  } 
 
   connectToAnyWiFi();
   lastWiFiAttempt = millis();
 
-  Serial.println("Boot complete");
-  Serial.print("Running firmware ");
-  Serial.println(FW_VERSION);
+  logPrintln("Boot complete");
+  logPrint("Running firmware ");
+  logPrintln(FW_VERSION);
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("Open: http://");
-    Serial.println(WiFi.localIP());
-    Serial.print("Or:   http://");
-    Serial.print(deviceName);
-    Serial.println(".local");
+    logPrint("Open: http://");
+    logPrintln(WiFi.localIP());
+    logPrint("Or:   http://");
+    logPrint(deviceName);
+    logPrintln(".local");
   } else {
-    Serial.println("Running offline; LEDs active, Wi-Fi will retry later.");
+    logPrintln("Running offline; LEDs active, Wi-Fi will retry later.");
   }
+
+  if (hasScale) {
+    bool scaleOk = initScaleWithTimeout(HX711_READY_TIMEOUT_MS);
+
+    if (!scaleOk) {
+      // Important: do NOT overwrite the saved hasScale setting here.
+      // This keeps the dashboard showing the intended config, but prevents
+      // the current boot from hanging.
+      hasScale = false;
+    }
+  }
+
+  logPrintln("Calculating LED positions");
+  for (int s = 0; s < 8; s++) {
+    for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
+        ledPos[s][p] = smallJellyFind3Dpos(p, s);
+    }
+  }
+
+  setupMusicUdp();
+  setupScaleUdp();
 
 }
 
@@ -174,12 +291,13 @@ void loop() {
   }
 
   ensureWiFi();
-
+  handleMusicUdp();
 
   if (identifyRequested) {
     identifyRequested = false;
     runIdentifySequence();
   }
-
   ledsTick();
+  //logPrintln(scale.get_units(1)); 
+  //logPrintf("RSSI: %d dBm\n", WiFi.RSSI());
 }

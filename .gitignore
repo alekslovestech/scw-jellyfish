@@ -3,3 +3,5 @@ dist/
 node_modules/
 *.pyc
 .vs/
+.venv/
+__pycache__/

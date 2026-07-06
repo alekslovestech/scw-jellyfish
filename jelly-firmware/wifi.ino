@@ -1,3 +1,13 @@
+#include <HTTPClient.h>
+#include <esp_wifi.h>
+#include <WiFiUdp.h>
+#include "config.h"
+
+WiFiUDP udp;
+WiFiUDP scaleUdp;
+
+String lastSendStatus = "Ready";
+bool hasReceivedNumber = false;
 // ── Credentials ───────────────────────────────────────────────────────────────
 
 struct WifiCredential {
@@ -6,22 +16,20 @@ struct WifiCredential {
 };
 
 WifiCredential wifiList[] = {
-  {"Nanonet2",              "Sgrunterundt"   },
-  {"TP-Link_2.4GHz_9EC673", ""               },
-  {"Airties_Air4960R_CK74", "kptfyk9397"     },
+ // {"Nanonet2",              "Sgrunterundt"   },
+  {"SCW", "Jellyfish"               },
+ // {"Airties_Air4960R_CK74", "kptfyk9397"     },
 };
 
 const int WIFI_COUNT = sizeof(wifiList) / sizeof(wifiList[0]);
-const unsigned long WIFI_CONNECT_TIMEOUT_MS = 3000;
-const unsigned long WIFI_RETRY_INTERVAL_MS  = 300000;
 
 String currentSSID = "";
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
 bool tryConnectSingleWiFi(const char* ssid, const char* password) {
-  Serial.print("Trying Wi-Fi: ");
-  Serial.println(ssid);
+  logPrint("Trying Wi-Fi: ");
+  logPrintln(ssid);
 
   WiFi.disconnect(true, true);
   delay(100);
@@ -32,15 +40,15 @@ bool tryConnectSingleWiFi(const char* ssid, const char* password) {
   unsigned long start = millis();
   while (millis() - start < WIFI_CONNECT_TIMEOUT_MS) {
     if (WiFi.status() == WL_CONNECTED) {
+      esp_wifi_set_ps(WIFI_PS_NONE);
       currentSSID = ssid;
-      Serial.print("Connected to "); Serial.println(ssid);
-      Serial.print("IP: ");          Serial.println(WiFi.localIP());
+      logPrint("Connected to "); logPrintln(ssid);
+      logPrint("IP: ");          logPrintln(WiFi.localIP());
       return true;
     }
     delay(250);
   }
-
-  Serial.print("Failed: "); Serial.println(ssid);
+  logPrint("Failed: "); logPrintln(ssid);
   return false;
 }
 
@@ -55,7 +63,7 @@ bool connectToAnyWiFi() {
   currentSSID = "";
   WiFi.disconnect(true, true);
   WiFi.mode(WIFI_OFF);
-  Serial.println("No Wi-Fi networks available, continuing offline.");
+  logPrintln("No Wi-Fi networks available, continuing offline.");
   return false;
 }
 
@@ -63,22 +71,72 @@ void ensureWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
   if (millis() - lastWiFiAttempt < WIFI_RETRY_INTERVAL_MS) return;
   lastWiFiAttempt = millis();
-
   connectToAnyWiFi();
-
 }
 
 void startMDNSIfNeeded() {
   if (WiFi.status() != WL_CONNECTED || mdnsStarted) return;
   if (MDNS.begin(deviceName.c_str())) {
     mdnsStarted = true;
-    Serial.printf("mDNS started: http://%s.local\n", deviceName.c_str());
+
+    MDNS.addService("esp32art", "tcp", 80);
+    MDNS.addServiceTxt("esp32art", "tcp", "name", deviceName.c_str());
+    MDNS.addServiceTxt("esp32art", "tcp", "fw", FW_VERSION);
+    MDNS.addServiceTxt("esp32art", "tcp", "chip", chipIdHex.c_str());
+    MDNS.addServiceTxt("esp32art", "tcp", "mac", getMacAddressString().c_str());
+    MDNS.addServiceTxt("esp32art", "tcp", "ssid", currentSSID.c_str());
+
+    logPrintf("mDNS started: http://%s.local\n", deviceName.c_str());
   } else {
-    Serial.println("mDNS failed to start");
+    logPrintln("mDNS failed to start");
   }
 }
 
-// ── Web server + OTA ──────────────────────────────────────────────────────────
+
+
+// UDP server for rapid sharing of eg music volume
+
+void setupMusicUdp() {
+  udp.begin(MUSIC_UDP_PORT);
+  logPrintf("Music UDP listening on port %d\n", MUSIC_UDP_PORT);
+}
+
+void handleMusicUdp() {
+  int packetSize = udp.parsePacket();
+  if (!packetSize) return;
+
+  char packet[128];
+  int len = udp.read(packet, sizeof(packet) - 1);
+  if (len <= 0) return;
+  packet[len] = '\0';
+
+  char mode[24];
+  float level;
+  int beat;
+  int hue;
+  float phase;
+
+  // Expected:
+  // heartbeat,0.843,1,0,0.032
+  int matched = sscanf(packet, "%23[^,],%f,%d,%d,%f",
+                       mode, &level, &beat, &hue, &phase);
+
+  if (matched == 5 && String(mode) == "heartbeat") {
+    if (heartbeatLevel==0) logPrint("New heartbeat detected");
+    heartbeatLevel = constrain(level, 0.0, 1.0);
+    heartbeatBeat = beat > 0;
+    heartbeatHue = constrain(hue, 0, 255);
+    heartbeatPhase = constrain(phase, 0.0, 1.0);
+    lastHeartbeatPacketMs = millis();
+  }
+}
+
+void setupScaleUdp() {
+  scaleUdp.begin(SCALE_UDP_PORT);
+  logPrintf("Scale UDP listening on port %d\n", SCALE_UDP_PORT);
+}
+
+// ── Web server + OTA 
 
 String htmlEscape(const String& in) {
   String out = in;
@@ -94,6 +152,43 @@ String wifiStatusText() {
     return "Connected to " + currentSSID + " (" + WiFi.localIP().toString() + ")";
   return "Not connected";
 }
+
+/*
+// ── Send number to the other device ───────────────────────────────────────────
+bool sendNumberToPeer(const String& host, float value) {
+  if (WiFi.status() != WL_CONNECTED) {
+    lastSendStatus = "Wi-Fi not connected";
+    return false;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+
+  String url = "http://" + host + "/setNumber";
+  if (!http.begin(client, url)) {
+    lastSendStatus = "Failed to begin HTTP request";
+    return false;
+  }
+
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  String body = "value=" + String(value);
+
+  int code = http.POST(body);
+  String response = http.getString();
+  http.end();
+
+  //logPrintf("POST %s -> %d\n", url.c_str(), code);
+  //logPrintln(response);
+
+  if (code >= 200 && code < 300) {
+    lastSendStatus = "Sent " + String(value) + " to " + host;
+    return true;
+  } else {
+    lastSendStatus = "Send failed, HTTP " + String(code);
+    return false;
+  }
+}
+*/
 
 String buildHtmlPage(const String& message = "") {
   String html;
@@ -124,6 +219,25 @@ String buildHtmlPage(const String& message = "") {
   html += "<p><b>Wi-Fi:</b> "    + htmlEscape(wifiStatusText()) + "</p>";
   if (WiFi.status() == WL_CONNECTED)
     html += "<p><b>Hostname:</b> <code>" + htmlEscape(deviceName) + ".local</code></p>";
+  html += "</div>";
+
+  html += "<div class='card'><h2>Last received number</h2>";
+  html += "<p style='font-size:2rem;margin:0;'><b>";
+  html += hasReceivedNumber ? String(_agitation) : String("--");
+  html += "</b></p>";
+  html += "<p class='muted'>JSON endpoint: <code>/number</code></p>";
+  html += "</div>";
+
+  html += "<div class='card'><h2>Send a number</h2>";
+  html += "<form method='POST' action='/sendNumber'>";
+  html += "<label>Receiver host or IP</label>";
+  html += "<input type='text' name='target' value='receiver.local'>";
+  html += "<label>Number</label>";
+  html += "<input type='number' name='value' value='123'>";
+  html += "<input type='submit' value='Send'></form></div>";
+
+  html += "<div class='card'><h2>Last send status</h2>";
+  html += "<p>" + htmlEscape(lastSendStatus) + "</p>";
   html += "</div>";
 
   html += "<div class='card'><h2>Identify this device</h2>";
@@ -159,9 +273,128 @@ void handleRename() {
   ESP.restart();
 }
 
+void handleStatus() {
+  String json = "{";
+  json += "\"name\":\"" + deviceName + "\",";
+  json += "\"firmware\":\"" FW_VERSION "\",";
+  json += "\"chip\":\"" + chipIdHex + "\",";
+  json += "\"mac\":\"" + getMacAddressString() + "\",";
+  json += "\"ssid\":\"" + currentSSID + "\",";
+  json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
+  json += "\"rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",";
+  //json += "\"number\":" + String(_agitation) + ",";
+  json += "\"hasScale\":" + String(hasScale ? "true" : "false") + ",";
+  json += "\"isJelly\":" + String(isJelly ? "true" : "false") + ",";
+  json += "\"pattern\":\"" + currentPattern + "\",";
+  //json += "\"hasNumber\":" + String(hasReceivedNumber ? "true" : "false");
+  json += "\"posX\":" + String(devicePos.x) + ",";
+  json += "\"posY\":" + String(devicePos.y) + ",";
+  json += "\"posZ\":" + String(devicePos.z);
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
 void handleIdentify() {
   identifyRequested = true;
   server.send(200, "text/html", buildHtmlPage("Identify sequence requested."));
+}
+
+/*void handleSendNumber() {
+  if (!server.hasArg("target") || !server.hasArg("value")) {
+    server.send(400, "text/plain", "Missing 'target' or 'value' field");
+    return;
+  }
+
+  String target = server.arg("target");
+  long value = server.arg("value").toInt();
+
+  bool ok = sendNumberToPeer(target, value);
+  server.send(200, "text/html",
+              buildHtmlPage(ok ? ("Sent " + String(value) + " to " + target)
+                               : ("Failed to send " + String(value) + " to " + target)));
+}
+
+void handleSetNumber() {
+  if (!server.hasArg("value")) {
+    server.send(400, "text/plain", "Missing 'value' field");
+    return;
+  }
+
+  _agitation = server.arg("value").toFloat();
+  hasReceivedNumber = true;
+
+  logPrintf("Received number: %ld\n", _agitation);
+  server.send(200, "text/html",
+              buildHtmlPage("Received number: " + String(_agitation)));
+}
+
+void handleGetNumber() {
+  String json = String("{\"number\":") + String(_agitation) +
+                ",\"hasNumber\":" + (hasReceivedNumber ? "true" : "false") + "}";
+  server.send(200, "application/json", json);
+}*/
+
+void handleLog() {
+  server.send(200, "text/plain", serialLog);
+}
+
+void handleConfig() {
+  bool newHasScale = hasScale;
+  bool newIsJelly = isJelly;
+
+  if (server.hasArg("hasScale")) {
+    String v = server.arg("hasScale");
+    newHasScale = (v == "1" || v == "true" || v == "on");
+  }
+
+  if (server.hasArg("isJelly")) {
+    String v = server.arg("isJelly");
+    newIsJelly = (v == "1" || v == "true" || v == "on");
+  }
+
+  saveDeviceConfig(newHasScale, newIsJelly);
+
+  server.send(200, "application/json",
+    String("{\"ok\":true,\"hasScale\":") + (hasScale ? "true" : "false") +
+    ",\"isJelly\":" + (isJelly ? "true" : "false") + "}"
+  );
+}
+
+void handlePattern() {
+  if (!server.hasArg("pattern")) {
+    server.send(400, "application/json", "{\"ok\":false,\"error\":\"Missing 'pattern' field\"}");
+    return;
+  }
+  savePattern(server.arg("pattern"));
+  logPrint("Changed pattern to: ");
+  logPrintln(currentPattern);
+  server.send(200, "application/json",
+    String("{\"ok\":true,\"pattern\":\"") + currentPattern + "\"}");
+}
+
+void handlePosition() {
+  struct Pos3D newPos = devicePos;
+
+  if (server.hasArg("posX")) {
+    newPos.x = server.arg("posX").toFloat();
+  }
+
+  if (server.hasArg("posY")) {
+    newPos.y = server.arg("posY").toFloat();
+  }
+
+  if (server.hasArg("posZ")) {
+    newPos.z = server.arg("posZ").toFloat();
+  }
+
+  saveDevicePos(newPos);
+
+  server.send(200, "application/json",
+    String("{\"ok\":true,\"posX\":") + String(devicePos.x, 3) +
+    ",\"posY\":" + String(devicePos.y, 3) +
+    ",\"posZ\":" + String(devicePos.z, 3) + "}"
+  );
 }
 
 void setupWebServer() {
@@ -170,6 +403,14 @@ void setupWebServer() {
   server.on("/",        HTTP_GET,  handleRoot);
   server.on("/rename",  HTTP_POST, handleRename);
   server.on("/identify",HTTP_POST, handleIdentify);
+  //server.on("/sendNumber", HTTP_POST, handleSendNumber);
+  //server.on("/number", HTTP_GET, handleGetNumber);
+  //server.on("/setNumber", HTTP_POST, handleSetNumber);
+  server.on("/log", HTTP_GET, handleLog);
+  server.on("/status", HTTP_GET, handleStatus);
+  server.on("/config", HTTP_POST, handleConfig);
+  server.on("/pattern", HTTP_POST, handlePattern);
+  server.on("/position", HTTP_POST, handlePosition);
 
   server.on("/update", HTTP_POST, []() {
     bool ok = !Update.hasError();
@@ -179,21 +420,24 @@ void setupWebServer() {
   }, []() {
     HTTPUpload& upload = server.upload();
     if (upload.status == UPLOAD_FILE_START) {
-      Serial.printf("Update start: %s\n", upload.filename.c_str());
+      logPrintf("Update start: %s\n", upload.filename.c_str());
       if (!Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_WRITE) {
       if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
         Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_END) {
-      if (Update.end(true)) Serial.printf("Update success: %u bytes\n", upload.totalSize);
+      if (Update.end(true)) logPrintf("Update success: %u bytes\n", upload.totalSize);
       else Update.printError(Serial);
     } else if (upload.status == UPLOAD_FILE_ABORTED) {
       Update.abort();
-      Serial.println("Update aborted");
+      logPrintln("Update aborted");
     }
   });
 
   server.begin();
   webServerStarted = true;
-  Serial.println("Web server started");
+  logPrintln("Web server started");
 }
+
+
+
