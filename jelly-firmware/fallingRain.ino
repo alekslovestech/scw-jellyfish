@@ -1,4 +1,5 @@
 #include "config.h"
+#include "color_utils.h"
 
 // fallingRain — ported from visualizer-ts/src/animations/fallingRain.ts.
 //
@@ -40,12 +41,8 @@ void fallingRain() {
         }
       }
 
-      // Head green tint baked as HEAD_G*intensity^2, blue as intensity (matches TS).
-      strips[s].SetPixelColor(p, RgbColor(
-        0,
-        fsToByte(HEAD_G * intensity * intensity * 255.0f),
-        fsToByte(intensity * 255.0f)
-      ));
+      // Head green tint baked into G via HEAD_G*intensity; blue is full (matches TS).
+      strips[s].SetPixelColor(p, rgbWithIntensity(0, HEAD_G * intensity, 1.0f, intensity));
     }
   }
 }

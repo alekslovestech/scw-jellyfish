@@ -1,3 +1,5 @@
+#include "color_utils.h"
+
 // fireSpread — ported from visualizer-ts/src/animations/fireSpread.ts
 // Private gradient tables + fsSample/fsSampleBlend live here (no other pattern
 // uses them). Segment/t comes from fsSegmentForPos() (leds.ino); FS_* consts and
@@ -101,7 +103,7 @@ void fireSpread() {
             intensity = preProgress * PRE_IGNITION_INTENSITY * segmentAlpha;
           }
         }
-        strips[s].SetPixelColor(p, RgbColor(fsToByte(r*intensity*255.0f), fsToByte(g*intensity*255.0f), fsToByte(b*intensity*255.0f)));
+        strips[s].SetPixelColor(p, rgbWithIntensity(r, g, b, intensity));
         continue;
       }
 
@@ -135,7 +137,7 @@ void fireSpread() {
       float baseIntensity = PRE_IGNITION_INTENSITY + (1.0f - PRE_IGNITION_INTENSITY) * kindleProgress;
       intensity = baseIntensity * flicker * segmentAlpha;
 
-      strips[s].SetPixelColor(p, RgbColor(fsToByte(r*intensity*255.0f), fsToByte(g*intensity*255.0f), fsToByte(b*intensity*255.0f)));
+      strips[s].SetPixelColor(p, rgbWithIntensity(r, g, b, intensity));
     }
   }
 }

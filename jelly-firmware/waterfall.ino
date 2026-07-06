@@ -1,3 +1,5 @@
+#include "color_utils.h"
+
 // waterfall — smooth downward-flowing waves, adapted from waterfall.ts.
 //
 // Driven by PHYSICAL HEIGHT (ledPos[s][p].y) so the folded inner tentacle reads as
@@ -10,6 +12,7 @@ void waterfall() {
   const float WAVE_COUNT = 2.0f;    // how many wave bands span the jelly at once
   const float WAVE_WIDTH = 0.45f;   // bright fraction of each cycle (the rest is the gap)
   const float DIM        = 0.25f;   // ambient glow between waves
+  const float COLOR_G        = 0.2f;
   const float COLOR_DARK_B   = 0.3f;
   const float COLOR_BRIGHT_B = 1.0f;
   const float MAX_DEPTH  = 1.8f;    // top (y=0) to lowest inner tip (~ -1.8)
@@ -37,12 +40,7 @@ void waterfall() {
         colorB    = COLOR_DARK_B + (COLOR_BRIGHT_B - COLOR_DARK_B) * bump;
       }
 
-      // Green baked as 0.2*intensity^2, blue as colorB*intensity (matches the TS look).
-      strips[s].SetPixelColor(p, RgbColor(
-        0,
-        fsToByte(0.2f * intensity * intensity * 255.0f),
-        fsToByte(colorB * intensity * 255.0f)
-      ));
+      strips[s].SetPixelColor(p, rgbWithIntensity(0, COLOR_G * intensity, colorB, intensity));
     }
   }
 }

@@ -1,4 +1,5 @@
 #include "config.h"
+#include "color_utils.h"
 
 // innerSpreadWave — ported from visualizer-ts/src/animations/innerSpreadWave.ts.
 //
@@ -36,14 +37,10 @@ void innerSpreadWave() {
 
       if (group == FS_SEG_INNER) {
         // Red worm on inner; dark between pulses (R = wave^2, matching the TS look).
-        strips[s].SetPixelColor(p, RgbColor(fsToByte(wave * wave * 255.0f), 0, 0));
+        strips[s].SetPixelColor(p, rgbWithIntensity(wave, 0, 0, wave));
       } else {
         // Bell/outer: blue at rest, red as the crest passes through.
-        strips[s].SetPixelColor(p, RgbColor(
-          fsToByte(wave * 255.0f),
-          0,
-          fsToByte((1.0f - wave) * 255.0f)
-        ));
+        strips[s].SetPixelColor(p, rgbWithIntensity(wave, 0, 1.0f - wave));
       }
     }
   }
