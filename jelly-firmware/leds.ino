@@ -31,12 +31,6 @@ float fsClamp01(float x) {
   return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
 }
 
-uint8_t fsToByte(float v) {
-  if (v <= 0.0f) return 0;
-  if (v >= 255.0f) return 255;
-  return (uint8_t)(v + 0.5f);
-}
-
 void fsSegmentForPos(int p, int* seg, float* t) {
   if (p < FS_INNER_LEDS) {
     *seg = FS_SEG_INNER; *t = p / (float)(FS_INNER_LEDS - 1);
@@ -163,20 +157,10 @@ void weightUpdate() {
   logPrintln(_calmness);
 }
 
-// Helper: convert a hue wheel position (0-255) into RGB
-RgbColor wheel(uint8_t pos)
-{
-  pos = pos%256;
-  pos = 255 - pos;
-  if (pos < 85) {
-    return RgbColor(255 - pos * 3, 0, pos * 3);
-  }
-  if (pos < 170) {
-    pos -= 85;
-    return RgbColor(0, pos * 3, 255 - pos * 3);
-  }
-  pos -= 170;
-  return RgbColor(pos * 3, 255 - pos * 3, 0);
+// Helper: convert a hue wheel position (0-255) into RGB via NeoPixelBus HslColor.
+RgbColor wheel(uint8_t pos) {
+  float hue = (255 - (pos % 256)) / 255.0f;
+  return RgbColor(HslColor(hue, 1.0f, 0.5f));
 }
 
 //Get position in the plane along one strip of a small jellyfish

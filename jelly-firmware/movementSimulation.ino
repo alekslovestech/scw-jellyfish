@@ -1,4 +1,5 @@
 #include "config.h"
+#include "color_utils.h"
 
 // movementSimulation — adapted from visualizer-ts/src/animations/movementSimulation.ts.
 //
@@ -51,7 +52,7 @@ void movementSimulation() {
 
       float depth = fsClamp01(-ledPos[s][p].y / MAX_DEPTH);
       float on = fsClamp01((litDepth - depth) / EDGE); // 1 inside, 0 outside, soft edge
-      strips[s].SetPixelColor(p, RgbColor(0, fsToByte(on * 255.0f), 0));
+      strips[s].SetPixelColor(p, rgbWithIntensity(0, 1.0f, 0, on));
     }
   }
 }

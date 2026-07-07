@@ -14,10 +14,7 @@ void twoToneDiffuse() {
   for (int s = 0; s < 8; s++) {
     for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
       float mix = fsInnerOuterMix(p);
-      uint8_t r = fsToByte(innerColor.R + (outerColor.R - innerColor.R) * mix);
-      uint8_t g = fsToByte(innerColor.G + (outerColor.G - innerColor.G) * mix);
-      uint8_t b = fsToByte(innerColor.B + (outerColor.B - innerColor.B) * mix);
-      strips[s].SetPixelColor(p, RgbColor(r, g, b));
+      strips[s].SetPixelColor(p, RgbColor::LinearBlend(innerColor, outerColor, mix));
     }
   }
 }

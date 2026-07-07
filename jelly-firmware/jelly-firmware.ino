@@ -8,7 +8,6 @@
 #include <Arduino.h>
 #include "version.h"
 #include "config.h"
-#include <array>
 #include "HX711.h"
 
 

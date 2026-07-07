@@ -1,4 +1,5 @@
 #include "config.h"
+#include "color_utils.h"
 
 // rainbowWave — ported from visualizer-ts/src/animations/rainbowWave.ts.
 //
@@ -41,11 +42,7 @@ void rainbowWave() {
       float hue = fmodf(angleHue + flowHue + jellyHue + timeSpin + timeFlow, 1.0f);
 
       RgbColor c = HslColor(hue, 1.0f, 0.5f * pulse);
-      strips[s].SetPixelColor(p, RgbColor(
-        fsToByte(c.R * pulse),
-        fsToByte(c.G * pulse),
-        fsToByte(c.B * pulse)
-      ));
+      strips[s].SetPixelColor(p, rgbWithIntensity(c, pulse));
     }
   }
 }

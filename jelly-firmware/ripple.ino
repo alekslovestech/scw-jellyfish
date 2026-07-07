@@ -1,4 +1,5 @@
 #include "config.h"
+#include "color_utils.h"
 
 // Three ripples between x = -2 and x = 2. Center wave the biggest. Value range 0..256
 float ripple(float x) {
@@ -14,11 +15,7 @@ void rippleOutFromPoint(struct Pos3D& startPoint, int frame, RgbColor rgb) {
     for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
       distance = distanceFast(startPoint, ledPos[s][p]);
       float f = ripple(frame/20.0f-distance*10.0f-2.0f);
-      strips[s].SetPixelColor(p, RgbColor(
-        (uint8_t)(f*rgb.R),
-        (uint8_t)(f*rgb.G),
-        (uint8_t)(f*rgb.B))
-      );
+      strips[s].SetPixelColor(p, rgbWithIntensity(rgb, f));
     }
   }
 }
