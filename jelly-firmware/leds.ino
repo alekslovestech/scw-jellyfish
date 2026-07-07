@@ -64,12 +64,12 @@ void drawFrame() {
     if (currentPattern == "demo") {
       demo();
     } else if (currentPattern == "ripple") {
-      if (_ledFrame%900==0) {
+      if (_ledFrame%5000==0) {
         point.x = random(-200,200)/100.0f;
         point.y = random(-200,50)/100.0f;
         point.z = random(-200,200)/100.0f;
       }
-      rippleOutFromPoint(point, _ledFrame%900, RgbColor(255,255,0));
+      rippleOutFromPoint(point, _ledFrame%5000, RgbColor(0,0,255));
     } else if (currentPattern == "colorwheel") {
       showColorWheelAcrossEightStrips();
     } else if (currentPattern == "bottomfill") {
@@ -86,6 +86,10 @@ void drawFrame() {
       fallingRain();
     } else if (currentPattern == "movementSimulation") {
       movementSimulation();
+    } else if (currentPattern == "sparkle") {
+      sparkle();
+    } else if (currentPattern == "crazy") {
+      crazy();
     } else if (currentPattern == "innerSpreadWave") {
       innerSpreadWave();
     } else if (currentPattern == "rainbowWave") {
@@ -157,11 +161,7 @@ void weightUpdate() {
   logPrintln(_calmness);
 }
 
-// Helper: convert a hue wheel position (0-255) into RGB via NeoPixelBus HslColor.
-RgbColor wheel(uint8_t pos) {
-  float hue = (255 - (pos % 256)) / 255.0f;
-  return RgbColor(HslColor(hue, 1.0f, 0.5f));
-}
+
 
 //Get position in the plane along one strip of a small jellyfish
 struct Pos2D smallJellyFind2Dpos(int p) {
