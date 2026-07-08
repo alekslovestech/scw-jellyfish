@@ -14,6 +14,7 @@ import { innerSpreadWave } from "./animations/innerSpreadWave";
 import { rainbowWave } from "./animations/rainbowWave";
 import { nuclearJellyfish } from "./animations/nuclearJellyfish";
 import { fireSpread } from "./animations/fireSpread";
+import { dualToneFlow } from "./animations/dualToneFlow";
 import { AnimationManager } from "./core/animationManager";
 
 
@@ -32,6 +33,7 @@ const animations = {
   innerSpreadWave,
   rainbowWave,
   nuclearJellyfish,
+  dualToneFlow,
 };
 
 export function buildPanel(redraw: () => void, animationManager: AnimationManager): void {

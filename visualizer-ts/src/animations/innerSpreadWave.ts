@@ -46,12 +46,12 @@ export const innerSpreadWave = {
       const wave = Math.max(0, Math.sin(pos * WORM_FREQ - time * SPEED + jellyOffset));
 
       if (segment === "inner") {
-        // Red worm on inner tentacles; dark between pulses.
-        led.color.setRGB(wave, 0, 0);
+        // Fuchsia worm on inner tentacles; dark between pulses.
+        led.color.setRGB(wave, 0, wave);
         led.intensity = wave;
       } else {
-        // Bell and outer are blue at rest; wave turns them red as it passes through.
-        led.color.setRGB(wave, 0, 1 - wave);
+        // Bell and outer are yellow at rest; wave turns them fuchsia as it passes through.
+        led.color.setRGB(1, 1 - wave, wave);
         led.intensity = 1;
       }
     }
