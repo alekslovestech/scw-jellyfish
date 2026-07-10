@@ -7,6 +7,8 @@ import { buildPanel } from "./panel";
 import { LEDSystem } from "./core/ledSystem";
 import { LEDRenderer } from "./core/ledRenderer";
 import { AnimationManager } from "./core/animationManager";
+import { effects } from "./animations/effects";
+import { movementSimulation } from "./animations/movementSimulation";
 
 
 // ── Renderer ────────────────────────────────────────────────────────────────
@@ -83,7 +85,8 @@ const centralMat = new THREE.MeshPhongMaterial({
 // ── LED SYSTEM ──────────────────────────────────────────────────────────────
 const ledSystem = new LEDSystem();
 const animationManager = new AnimationManager();
-animationManager.set(cfg.animation);
+animationManager.set(movementSimulation); // default base animation
+animationManager.setEffects(effects);
 const ledRenderer = new LEDRenderer(ledSystem, animationManager);
 scene.add(ledRenderer.getObject());
 

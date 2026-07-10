@@ -1,5 +1,7 @@
 import { LED } from "../core/ledSystem";
 import { getLEDDescriptor } from "../ledMap";
+import { cfg } from "../config";
+import { isLit } from "./movementReach";
 
 // ─────────────────────────────────────────────────────────────
 // INNER SPREAD WAVE SETTINGS
@@ -35,8 +37,15 @@ export const innerSpreadWave = {
   name: "innerSpreadWave",
 
   update(leds: LED[], time: number) {
+    // Two-colour palette (editable live from the panel):
+    //   inner = the travelling "worm"/wave colour, outer = the rest colour.
+    // Defaults of fuchsia (inner) + yellow (outer) reproduce the original look.
+    const inner = cfg.palette.inner;
+    const outer = cfg.palette.outer;
+
     for (const led of leds) {
-      const { segment, jellyId } = getLEDDescriptor(led.id);
+      const desc = getLEDDescriptor(led.id);
+      const { segment, jellyId } = desc;
       const t = led.t ?? 0;
 
       const pos = pathPos(segment, t);
@@ -45,14 +54,24 @@ export const innerSpreadWave = {
       // Traveling wave: crest moves from inner tip (pos=0) toward outer tip (pos=1).
       const wave = Math.max(0, Math.sin(pos * WORM_FREQ - time * SPEED + jellyOffset));
 
+      // Tentacle motion + intense-reaction reach come from the shared engine:
+      // the worm colour is only visible where the tentacle currently reaches, so
+      // a reaction extends it outward exactly like movementSimulation.
+      const on = isLit(desc, time);
+
       if (segment === "inner") {
-        // Fuchsia worm on inner tentacles; dark between pulses.
-        led.color.setRGB(wave, 0, wave);
-        led.intensity = wave;
+        // Worm colour on inner tentacles; dark between pulses.
+        led.color.setRGB(inner.r * wave, inner.g * wave, inner.b * wave);
+        led.intensity = on ? wave : 0;
       } else {
-        // Bell and outer are yellow at rest; wave turns them fuchsia as it passes through.
-        led.color.setRGB(1, 1 - wave, wave);
-        led.intensity = 1;
+        // Bell and outer rest at the outer colour; the wave blends them toward
+        // the worm colour as it passes through.
+        led.color.setRGB(
+          outer.r + (inner.r - outer.r) * wave,
+          outer.g + (inner.g - outer.g) * wave,
+          outer.b + (inner.b - outer.b) * wave,
+        );
+        led.intensity = on ? 1 : 0;
       }
     }
   },
