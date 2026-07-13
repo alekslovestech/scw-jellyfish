@@ -19,6 +19,7 @@ const params = {
 export const colorCycle: Effect = {
   name: "colorCycle",
   enabled: false, // off by default — toggle it on in the panel
+  colorMode: "two", // drives the 2-colour bases (movementSimulation, innerSpreadWave)
 
   params,
   controls: [

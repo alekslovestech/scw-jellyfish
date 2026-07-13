@@ -65,8 +65,15 @@ function innerStops(): GradientStop[] {
 
 // ── Animation ─────────────────────────────────────────────────────────────────
 
+// Speed multiplier on the flame motion — the wobble + flicker that make the
+// otherwise-steady fire feel alive (1 = the original cadence).
+const params = { speed: 1 };
+
 export const fireSteady: LEDAnimation = {
   name: "fireSteady",
+  colorMode: "three",
+  params,
+  controls: [{ key: "speed", label: "speed", min: 0.1, max: 3, step: 0.05 }],
 
   update(leds: LED[], time: number) {
     // Rebuild gradients once per frame so palette edits apply live.
@@ -100,11 +107,11 @@ export const fireSteady: LEDAnimation = {
       }
 
       // Colour: sample the gradient at a wobbling position for a flame-lick feel.
-      const wave = WOBBLE_AMP * Math.sin(gradPos * WOBBLE_FREQ - time * WAVE_SPEED);
+      const wave = WOBBLE_AMP * Math.sin(gradPos * WOBBLE_FREQ - time * WAVE_SPEED * params.speed);
       const [r, g, b] = sample(gradient, gradPos + wave);
 
       // Full-strength flicker (per-LED phase) — the shimmer of a live flame.
-      const flicker = 1 - FLICKER_AMP * (0.5 + 0.5 * Math.sin(time * FLICKER_FREQ + led.id * FLICKER_PHASE));
+      const flicker = 1 - FLICKER_AMP * (0.5 + 0.5 * Math.sin(time * FLICKER_FREQ * params.speed + led.id * FLICKER_PHASE));
 
       led.color.setRGB(r, g, b);
       led.intensity = flicker;

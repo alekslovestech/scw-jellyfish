@@ -78,6 +78,14 @@ export interface FirePaletteConfig {
   c3: RGB01;
 }
 
+// Master per-segment brightness (0–1), applied to every animation as the final
+// step after the base + effects. `inner` scales the inner tentacles; `outer`
+// scales the outer tentacles and the bell together.
+export interface BrightnessConfig {
+  inner: number;
+  outer: number;
+}
+
 export interface LightingConfig {
   ambient_color: number;
   ambient_intensity: number;
@@ -96,6 +104,7 @@ export interface Config {
   colors: ColorsConfig;
   palette: PaletteConfig;
   firePalette: FirePaletteConfig;
+  brightness: BrightnessConfig;
   lighting: LightingConfig;
   size_ratio: number; // scale factor per level (e.g. 0.6 → each level is 60% of previous)
   z_offset: number; // Z step between levels; level N sits at N * z_offset
@@ -152,6 +161,10 @@ export const cfg: Config = {
     c1: { r: 1, g: 1, b: 0 },   // yellow — near the base
     c2: { r: 1, g: 0.2, b: 0 }, // orange — mid
     c3: { r: 1, g: 0, b: 0 },   // red — tips
+  },
+  brightness: {
+    inner: 1, // full brightness by default
+    outer: 1,
   },
   lighting: {
     ambient_color: 0x334455,

@@ -20,14 +20,23 @@ function smoothstep(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+// Speed multiplier on the tentacle sweep (1 = default reach cadence).
+const params = { speed: 1 };
+
 export const movementSimulation = {
   name: "movementSimulation",
+  colorMode: "two" as const,
+  params,
+  controls: [{ key: "speed", label: "speed", min: 0.1, max: 6, step: 0.05 }],
 
   update(leds: LED[], time: number) {
     // Two-colour palette (inner tips → outer tips), editable live from the panel.
     // Stored as normalised 0–1 RGB, used directly below.
     const inner = cfg.palette.inner;
     const outer = cfg.palette.outer;
+
+    // The sweep is this animation's only motion, so `speed` scales its clock.
+    const t = time * params.speed;
 
     for (const led of leds) {
       const desc = getLEDDescriptor(led.id);
@@ -43,7 +52,7 @@ export const movementSimulation = {
       );
 
       // Tentacle motion + intense-reaction reach come from the shared engine.
-      led.intensity = isLit(desc, time) ? 1.0 : 0.0;
+      led.intensity = isLit(desc, t) ? 1.0 : 0.0;
     }
   },
 };

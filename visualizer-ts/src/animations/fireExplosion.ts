@@ -94,6 +94,7 @@ const explosionEnd: number[]      = new Array(13).fill(-Infinity);
 
 export const fireExplosion: LEDAnimation = {
   name: "fire explosion",
+  colorMode: "three",
 
   update(leds: LED[], time: number) {
     if (startTime < 0) startTime = time;

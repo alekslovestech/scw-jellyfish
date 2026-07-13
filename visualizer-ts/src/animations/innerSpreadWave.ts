@@ -33,8 +33,16 @@ function pathPos(segment: string, t: number): number {
   return 0.8 + t * 0.2;                             // t=0 root → t=1 outer tip
 }
 
+// Speed multiplier on the travelling wave (1 = the original SPEED cadence).
+const params = { speed: 1 };
+
 export const innerSpreadWave = {
   name: "innerSpreadWave",
+  colorMode: "two" as const,
+  // innerGlow only reads well over movementSimulation — hide it here.
+  excludeEffects: ["innerGlow"],
+  params,
+  controls: [{ key: "speed", label: "speed", min: 0.1, max: 6, step: 0.05 }],
 
   update(leds: LED[], time: number) {
     // Two-colour palette (editable live from the panel):
@@ -52,7 +60,7 @@ export const innerSpreadWave = {
       const jellyOffset = jellyId * JELLY_PHASE;
 
       // Traveling wave: crest moves from inner tip (pos=0) toward outer tip (pos=1).
-      const wave = Math.max(0, Math.sin(pos * WORM_FREQ - time * SPEED + jellyOffset));
+      const wave = Math.max(0, Math.sin(pos * WORM_FREQ - time * SPEED * params.speed + jellyOffset));
 
       // Tentacle motion + intense-reaction reach come from the shared engine:
       // the worm colour is only visible where the tentacle currently reaches, so

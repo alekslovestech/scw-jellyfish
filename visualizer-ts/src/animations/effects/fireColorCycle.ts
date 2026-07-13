@@ -39,8 +39,12 @@ const params = {
 };
 
 export const fireColorCycle: Effect = {
-  name: "fireColorCycle",
+  // Shown in the panel as just "colorCycle" — it only appears when the
+  // 3-colour fireSteady base is selected, so it never collides with the
+  // 2-colour colorCycle effect.
+  name: "colorCycle",
   enabled: false, // off by default — toggle it on in the panel
+  colorMode: "three", // drives the 3-colour fireSteady base
 
   params,
   controls: [
