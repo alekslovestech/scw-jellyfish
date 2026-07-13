@@ -4,6 +4,7 @@ import { fireColorCycle } from "./fireColorCycle";
 import { intenseReaction } from "./intenseReaction";
 import { innerWave } from "./innerWave";
 import { tvStatic } from "./tvStatic";
+import { bubblePulse } from "./bubblePulse";
 
 // The effect stack, applied (in order) on top of the base animation every frame.
 // Add new effects here to make them available to the manager and the panel.
@@ -16,4 +17,5 @@ export const effects: Effect[] = [
   intenseReaction,
   innerWave,
   tvStatic,
+  bubblePulse,
 ];
