@@ -32,6 +32,29 @@ bool hasScale = false;
 bool isJelly = false;
 String currentPattern = "demo";   // heartbeat | demo | ripple | fireSpread | waterfall | twoToneDiffuse | fallingRain | movementSimulation | innerSpreadWave | rainbowWave
 
+float localWeight = 0.0f;
+float localWeightSmooth = 0.0f;
+float localAgitation = 0.0f;
+float localCalmness = 1.0f;
+
+unsigned long lastScaleSampleMs = 0;
+unsigned long lastScaleBroadcastMs = 0;
+
+struct ScalePeer {
+  bool active;
+  String chip;
+  String name;
+  IPAddress ip;
+
+  float weight;
+  float agitation;
+  float calmness;
+
+  unsigned long lastSeenMs;
+};
+
+ScalePeer scalePeers[MAX_SCALE_PEERS];
+
 // Defined here (concatenated first) so fireSpread.ino sees them — variables, unlike
 // functions, are not auto-prototyped across the sketch's alphabetical tab order.
 int   _ledFrame = 0;          // shared animation frame counter
@@ -291,6 +314,11 @@ void loop() {
 
   ensureWiFi();
   handleMusicUdp();
+
+  updateLocalScaleState();
+  broadcastScaleState();
+  handleScaleUdp();
+  expireScalePeers();
 
   if (identifyRequested) {
     identifyRequested = false;

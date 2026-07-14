@@ -29,6 +29,17 @@ constexpr unsigned long HX711_READY_TIMEOUT_MS = 1500;
 const unsigned long WIFI_CONNECT_TIMEOUT_MS = 5000;
 const unsigned long WIFI_RETRY_INTERVAL_MS  = 1000000;
 
+// ── scales ───────────────────────────────────────────────────────
+const int MAX_SCALE_PEERS = 16;
+
+const unsigned long SCALE_BROADCAST_INTERVAL_MS = 100;
+const unsigned long SCALE_PEER_TIMEOUT_MS = 3000;
+
+const unsigned long SCALE_SAMPLE_INTERVAL_MS = 40;
+
+const float SCALE_SMOOTHING = 0.08f;
+const float AGITATION_SMOOTHING = 0.15f;
+
 // ── UDP ports ───────────────────────────────────────────────────
 const int MUSIC_UDP_PORT = 4210;
 const int SCALE_UDP_PORT = 4211;

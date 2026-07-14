@@ -136,6 +136,60 @@ void setupScaleUdp() {
   logPrintf("Scale UDP listening on port %d\n", SCALE_UDP_PORT);
 }
 
+void handleScaleUdp() {
+  int packetSize = scaleUdp.parsePacket();
+  if (!packetSize) return;
+
+  char packet[192];
+  int len = scaleUdp.read(packet, sizeof(packet) - 1);
+  if (len <= 0) return;
+  packet[len] = '\0';
+
+  char kind[12];
+  char chip[24];
+  char name[40];
+  float weight;
+  float agitation;
+  float calmness;
+  unsigned long remoteMs;
+
+  int matched = sscanf(
+    packet,
+    "%11[^,],%23[^,],%39[^,],%f,%f,%f,%lu",
+    kind,
+    chip,
+    name,
+    &weight,
+    &agitation,
+    &calmness,
+    &remoteMs
+  );
+
+  if (matched != 7) return;
+  if (String(kind) != "scale") return;
+
+  String peerChip = String(chip);
+
+  // Ignore our own broadcast.
+  if (peerChip == chipIdHex) return;
+
+  int idx = findScalePeerByChip(peerChip);
+  if (idx < 0) {
+    idx = findFreeScalePeerSlot();
+  }
+
+  scalePeers[idx].active = true;
+  scalePeers[idx].chip = peerChip;
+  scalePeers[idx].name = String(name);
+  scalePeers[idx].ip = scaleUdp.remoteIP();
+
+  scalePeers[idx].weight = weight;
+  scalePeers[idx].agitation = constrain(agitation, 0.0f, 1.0f);
+  scalePeers[idx].calmness = constrain(calmness, 0.0f, 1.0f);
+
+  scalePeers[idx].lastSeenMs = millis();
+}
+
 // ── Web server + OTA 
 
 String htmlEscape(const String& in) {
@@ -153,6 +207,88 @@ String wifiStatusText() {
   return "Not connected";
 }
 
+int findScalePeerByChip(const String& chip) {
+  for (int i = 0; i < MAX_SCALE_PEERS; i++) {
+    if (scalePeers[i].active && scalePeers[i].chip == chip) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int findFreeScalePeerSlot() {
+  for (int i = 0; i < MAX_SCALE_PEERS; i++) {
+    if (!scalePeers[i].active) {
+      return i;
+    }
+  }
+
+  // If full, overwrite the stalest peer.
+  int oldest = 0;
+  for (int i = 1; i < MAX_SCALE_PEERS; i++) {
+    if (scalePeers[i].lastSeenMs < scalePeers[oldest].lastSeenMs) {
+      oldest = i;
+    }
+  }
+  return oldest;
+}
+
+void expireScalePeers() {
+  unsigned long now = millis();
+
+  for (int i = 0; i < MAX_SCALE_PEERS; i++) {
+    if (!scalePeers[i].active) continue;
+
+    if (now - scalePeers[i].lastSeenMs > SCALE_PEER_TIMEOUT_MS) {
+      scalePeers[i].active = false;
+    }
+  }
+}
+
+int getActiveScaleCount() {
+  int count = 0;
+
+  for (int i = 0; i < MAX_SCALE_PEERS; i++) {
+    if (scalePeers[i].active) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+void broadcastScaleState() {
+  if (!hasScale) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  unsigned long now = millis();
+  if (now - lastScaleBroadcastMs < SCALE_BROADCAST_INTERVAL_MS) return;
+  lastScaleBroadcastMs = now;
+
+  IPAddress broadcastIp(255, 255, 255, 255);
+
+  String packet;
+  packet.reserve(160);
+
+  // Format:
+  // scale,<chip>,<name>,<weight>,<agitation>,<calmness>,<ms>
+  packet += "scale,";
+  packet += chipIdHex;
+  packet += ",";
+  packet += deviceName;
+  packet += ",";
+  packet += String(localWeight, 3);
+  packet += ",";
+  packet += String(localAgitation, 3);
+  packet += ",";
+  packet += String(localCalmness, 3);
+  packet += ",";
+  packet += String(now);
+
+  scaleUdp.beginPacket(broadcastIp, SCALE_UDP_PORT);
+  scaleUdp.write((const uint8_t*)packet.c_str(), packet.length());
+  scaleUdp.endPacket();
+}
 /*
 // ── Send number to the other device ───────────────────────────────────────────
 bool sendNumberToPeer(const String& host, float value) {
