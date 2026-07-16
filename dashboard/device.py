@@ -21,6 +21,7 @@ class Device:
     chip: str = ""
     firmware: str = ""
     ssid: str = ""
+    device_id: int = 0
     rssi: int | None = None
     signal_quality: str = ""
     last_seen: float = field(default_factory=time.time)
@@ -30,6 +31,7 @@ class Device:
     status_error: str = ""
     has_scale: bool = False
     is_jelly: bool = False
+    is_big: bool = False
     pattern: str = "demo"
     posX: float = 0.0
     posY: float = 0.0
@@ -52,6 +54,7 @@ class Device:
             "chip": self.chip,
             "firmware": self.firmware,
             "ssid": self.ssid,
+            "id": self.device_id,
             "rssi": self.rssi,
             "signalQuality": self.signal_quality,
             "lastSeenAgo": round(time.time() - self.last_seen, 1),
@@ -61,6 +64,7 @@ class Device:
             "statusError": self.status_error,
             "hasScale": self.has_scale,
             "isJelly": self.is_jelly,
+            "isBig": self.is_big,
             "pattern": self.pattern,
             "posX": self.posX,
             "posY": self.posY,

@@ -26,6 +26,13 @@ const int HX711_SCK  = 13;
 constexpr unsigned long HX711_READY_TIMEOUT_MS = 1500;
 
 // ── Wi-Fi ───────────────────────────────────────────────────────
+constexpr uint8_t MIN_DEVICE_ID = 1;
+constexpr uint8_t MAX_DEVICE_ID = 16;
+
+// Temporary provisioning address used while deviceId is still 0.
+// Only power/configure one unassigned device at a time.
+constexpr uint8_t UNASSIGNED_IP_OCTET = 200;
+
 const unsigned long WIFI_CONNECT_TIMEOUT_MS = 5000;
 const unsigned long WIFI_RETRY_INTERVAL_MS  = 1000000;
 
