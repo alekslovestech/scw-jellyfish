@@ -8,7 +8,6 @@ keeps status fresh, and lets you identify, rename, send values, and upload OTA f
 
 from __future__ import annotations
 import asyncio
-import socket
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,102 +17,22 @@ from typing import Any
 import httpx
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
+from zeroconf import ServiceBrowser, Zeroconf
 from device import DEVICE_TIMEOUT_SECONDS, Device
+from discovery import SERVICE_TYPE, ESPListener
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-SERVICE_TYPE = "_esp32art._tcp.local."
 POLL_INTERVAL_SECONDS = 2.0
 REQUEST_TIMEOUT_SECONDS = 2.0
 
 DEVICES: dict[str, Device] = {}
 
 
-def get_device_id(d: Device) -> int:
-    """Return the permanent fleet ID, or 0 while unassigned/unknown."""
-    try:
-        return int(getattr(d, "device_id", 0) or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
-def set_device_id(d: Device, value: Any) -> None:
-    """Store a device ID without requiring an immediate Device class change."""
-    try:
-        setattr(d, "device_id", int(value))
-    except (TypeError, ValueError):
-        pass
-
-
-def decode_txt(properties: dict[bytes, bytes | None]) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for k, v in properties.items():
-        key = k.decode(errors="ignore") if isinstance(k, bytes) else str(k)
-        if v is None:
-            out[key] = ""
-        else:
-            out[key] = v.decode(errors="ignore") if isinstance(v, bytes) else str(v)
-    return out
-
-
-def rssi_quality(rssi: int | None) -> str:
-    if rssi is None:
-        return ""
-    if rssi >= -55:
-        return "Excellent"
-    if rssi >= -65:
-        return "Good"
-    if rssi >= -75:
-        return "Fair"
-    return "Weak"
-
-class ESPListener(ServiceListener):
-    def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
-        self.add_service(zc, type_, name)
-
-    def add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
-        info = zc.get_service_info(type_, name, timeout=2000)
-        if not info or not info.addresses:
-            return
-
-        ip = socket.inet_ntoa(info.addresses[0])
-        txt = decode_txt(info.properties)
-        device_name = txt.get("name") or name.replace(f".{SERVICE_TYPE}", "").replace(".local.", "")
-        key = txt.get("chip") or txt.get("mac") or name
-
-        d = DEVICES.get(key) or Device(key=key, name=device_name, host=info.server, ip=ip, port=info.port or 80)
-        d.name = device_name
-        d.host = info.server.rstrip(".")
-        d.ip = ip
-        d.port = info.port or 80
-        d.mac = txt.get("mac", d.mac)
-        d.chip = txt.get("chip", d.chip)
-        d.firmware = txt.get("fw", d.firmware)
-        d.ssid = txt.get("ssid", d.ssid)
-        if "id" in txt:
-            set_device_id(d, txt["id"])
-        if "rssi" in txt:
-            try:
-                d.rssi = int(txt["rssi"])
-                d.signal_quality = rssi_quality(d.rssi)
-            except ValueError:
-                pass
-        d.online = True
-        d.last_seen = time.time()
-        d.status_error = ""
-        DEVICES[key] = d
-
-    def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
-        for d in DEVICES.values():
-            if name.startswith(d.name):
-                d.online = False
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.zeroconf = Zeroconf()
-    app.state.browser = ServiceBrowser(app.state.zeroconf, SERVICE_TYPE, ESPListener())
+    app.state.browser = ServiceBrowser(app.state.zeroconf, SERVICE_TYPE, ESPListener(DEVICES))
     app.state.poll_task = asyncio.create_task(poll_loop())
     try:
         yield
@@ -144,29 +63,7 @@ async def poll_device(client: httpx.AsyncClient, d: Device) -> None:
             # Fallback for your current code: /number already exists.
             r = await client.get(f"{d.base_url}/number")
         r.raise_for_status()
-        data = r.json()
-        d.online = True
-        d.last_seen = time.time()
-        d.status_error = ""
-        d.number = data.get("number", d.number)
-        d.has_number = bool(data.get("hasNumber", d.has_number))
-        d.name = data.get("name", d.name)
-        d.mac = data.get("mac", d.mac)
-        d.chip = data.get("chip", d.chip)
-        d.firmware = data.get("firmware", d.firmware)
-        d.ssid = data.get("ssid", d.ssid)
-        if data.get("id") is not None:
-            set_device_id(d, data.get("id"))
-        d.has_scale = bool(data.get("hasScale", d.has_scale))
-        d.is_jelly = bool(data.get("isJelly", d.is_jelly))
-        d.is_big = bool(data.get("isBig", d.is_big))
-        d.pattern = data.get("pattern", d.pattern)
-        d.posX = float(data.get("posX", d.posX))
-        d.posY = float(data.get("posY", d.posY))
-        d.posZ = float(data.get("posZ", d.posZ))
-        if data.get("rssi") is not None:
-            d.rssi = int(data.get("rssi"))
-            d.signal_quality = rssi_quality(d.rssi)
+        d.apply_status(r.json())
     except Exception as e:
         if time.time() - d.last_seen > DEVICE_TIMEOUT_SECONDS:
             d.online = False
@@ -190,9 +87,7 @@ async def api_devices() -> dict[str, Any]:
     devices: list[dict[str, Any]] = []
 
     for d in DEVICES.values():
-        item = d.as_dict()
-        item["id"] = get_device_id(d)
-        devices.append(item)
+        devices.append(d.as_dict())
 
     # Assigned devices first in numerical order; unassigned devices last.
     devices.sort(
@@ -258,7 +153,7 @@ async def api_device_id(key: str, id: int = Form(...)):
 
     # Prevent accidental duplicate IDs among devices already known to the dashboard.
     conflict = next(
-        (other for other in DEVICES.values() if other is not d and get_device_id(other) == id),
+        (other for other in DEVICES.values() if other is not d and other.device_id == id),
         None,
     )
     if conflict is not None:
@@ -284,7 +179,7 @@ async def api_device_id(key: str, id: int = Form(...)):
         pass
 
     if ok:
-        set_device_id(d, response_body.get("id", id))
+        d.set_device_id(response_body.get("id", id))
         d.ip = response_body.get("ip", f"192.168.0.{100 + id}")
         d.online = False  # It is rebooting and will be rediscovered/polled shortly.
         d.status_error = "Rebooting after device ID change"
@@ -292,7 +187,7 @@ async def api_device_id(key: str, id: int = Form(...)):
     return {
         "ok": ok,
         "http": r.status_code,
-        "id": get_device_id(d),
+        "id": d.device_id,
         "ip": d.ip,
         "body": r.text[:300],
     }
