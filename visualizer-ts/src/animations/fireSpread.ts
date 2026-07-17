@@ -146,6 +146,7 @@ let startTime = -1;
 
 export const fireSpread: LEDAnimation = {
   name: "fireSpread",
+  colorMode: "three",
 
   update(leds: LED[], time: number) {
     if (startTime < 0) startTime = time;

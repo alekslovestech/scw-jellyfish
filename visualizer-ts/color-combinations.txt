@@ -1,0 +1,15 @@
+GOOD COLOR COMBINATIONS
+=======================
+Two-colour palettes (inner → outer) for dualToneFlow.ts.
+Copy any of these into the PALETTES array. More to be added later.
+
+{ inner: { r: 0.00, g: 0.80, b: 0.75 }, outer: { r: 0.95, g: 0.25, b: 0.55 } }, // teal → magenta
+{ inner: { r: 1.00, g: 0.50, b: 0.00 }, outer: { r: 0.00, g: 1.00, b: 0.00 } }, // orange → green   (movementSimulation)
+{ inner: { r: 1.00, g: 0.00, b: 1.00 }, outer: { r: 1.00, g: 1.00, b: 0.00 } }, // fuchsia → yellow (innerSpreadWave)
+{ inner: { r: 0.00, g: 0.15, b: 1.00 }, outer: { r: 0.55, g: 0.00, b: 0.95 } }, // electric blue → purple
+{ inner: { r: 1.00, g: 0.00, b: 0.85 }, outer: { r: 0.20, g: 0.00, b: 0.90 } }, // magenta → indigo
+{ inner: { r: 0.00, g: 1.00, b: 0.00 }, outer: { r: 0.00, g: 0.20, b: 1.00 } }, // pure green → deep blue
+{ inner: { r: 0.00, g: 0.75, b: 1.00 }, outer: { r: 0.50, g: 0.00, b: 1.00 } }, // azure / sky blue → violet
+{ inner: { r: 0.00, g: 1.00, b: 0.00 }, outer: { r: 1.00, g: 0.90, b: 0.00 } }, // pure green → yellow
+{ inner: { r: 1.00, g: 0.20, b: 0.00 }, outer: { r: 0.00, g: 1.00, b: 0.00 } }, // red-orange → green
+{ inner: { r: 1.00, g: 0.20, b: 0.00 }, outer: { r: 1.00, g: 0.00, b: 0.00 } }, // red-orange → red
