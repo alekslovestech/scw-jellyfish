@@ -1,4 +1,5 @@
 #include "config.h"
+#include "color_utils.h"
 
 // Color wheel pattern — a hue wheel spread across the 8 strips, slowly drifting.
 // Uses the wheel() helper in leds.ino.

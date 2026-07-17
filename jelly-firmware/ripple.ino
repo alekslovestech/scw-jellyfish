@@ -14,7 +14,7 @@ void rippleOutFromPoint(struct Pos3D& startPoint, int frame, RgbColor rgb) {
   for (int s = 0; s < 8; s++) {
     for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
       distance = distanceFast(startPoint, ledPos[s][p]);
-      float f = ripple(frame/20.0f-distance*10.0f-2.0f);
+      float f = ripple(frame/100.0f-distance*10.0f-2.0f);
       strips[s].SetPixelColor(p, rgbWithIntensity(rgb, f));
     }
   }

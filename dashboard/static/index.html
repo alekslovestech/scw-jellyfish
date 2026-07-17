@@ -11,7 +11,7 @@
     table{border-collapse:collapse;width:100%;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px #0001}
     th,td{text-align:left;padding:10px;border-bottom:1px solid #eee;vertical-align:middle}th{background:#f0f0f0}
     .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px}.on{background:#19a34a}.off{background:#c22}
-    .actions{display:flex;gap:6px;flex-wrap:wrap}.actions form{display:inline-flex;gap:6px;align-items:center}.small{width:90px}.name{width:140px}.loc{width:72px}.locationForm{display:flex;gap:6px;align-items:end;flex-wrap:wrap}.locationForm label{font-size:12px;color:#555}.locationForm input{display:block;margin-top:2px}.log{white-space:pre-wrap;background:#111;color:#eee;padding:12px;border-radius:8px;min-height:40px}.deviceLog{max-height:420px;overflow:auto}.panel{margin-top:20px;background:white;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}.hidden{display:none}.rowbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}.actions form{display:inline-flex;gap:6px;align-items:center}.small{width:90px}.deviceId{width:58px}.name{width:140px}.loc{width:72px}.locationForm{display:flex;gap:6px;align-items:end;flex-wrap:wrap}.locationForm label{font-size:12px;color:#555}.locationForm input{display:block;margin-top:2px}.log{white-space:pre-wrap;background:#111;color:#eee;padding:12px;border-radius:8px;min-height:40px}.deviceLog{max-height:420px;overflow:auto}.panel{margin-top:20px;background:white;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}.hidden{display:none}.rowbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
   </style>
 </head>
 <body>
@@ -24,8 +24,8 @@
   </div>
 
   <table>
-    <thead><tr><th>Status</th><th>Name</th><th>Address</th><th>Firmware</th><th>Signal</th><th>Position</th><th>Config</th><th>Last seen</th><th>Actions</th></tr></thead>
-    <tbody id="rows"><tr><td colspan="9">Waiting for ESP32 devices...</td></tr></tbody>
+    <thead><tr><th>Status</th><th>ID</th><th>Name</th><th>Address</th><th>Firmware</th><th>Signal</th><th>Position</th><th>Config</th><th>Last seen</th><th>Actions</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="10">Waiting for ESP32 devices...</td></tr></tbody>
   </table>
 
   <div id="deviceLogPanel" class="panel hidden">
@@ -70,6 +70,8 @@ const PATTERNS = [
   ['movementSimulation', 'Movement simulation'],
   ['innerSpreadWave', 'Inner spread wave'],
   ['rainbowWave', 'Rainbow wave'],
+  ['crazy', 'Crazy'],
+  ['sparkle', 'Sparkle'],
 ];
 
 function patternSelect(current){
@@ -97,6 +99,14 @@ function signalHtml(d){
   if(d.rssi === null || d.rssi === undefined) return '-';
   return esc(d.rssi) + ' dBm<br><small>' + esc(d.signalQuality || '') + '</small>';
 }
+async function assignDeviceId(encodedKey, form){
+  const requested = Number(new FormData(form).get('id'));
+  const current = Number(form.querySelector('[name="id"]').defaultValue || 0);
+  const action = current ? `Change device ID from ${current} to ${requested}? The ESP will reboot at 192.168.0.${100 + requested}.` : `Assign device ID ${requested}? The ESP will reboot at 192.168.0.${100 + requested}.`;
+  if(!confirm(action)) return;
+  await postForm('/api/device/' + encodedKey + '/device-id', form);
+}
+
 async function postForm(url, form){
   const body = new FormData(form);
   const r = await fetch(url, {method:'POST', body});
@@ -136,10 +146,17 @@ async function refreshDeviceLog(){
 async function refresh(force=false){
   if(!force && tableHasActiveFormState()) return;
   const data = await fetch('/api/devices').then(r => r.json());
-  if(!data.devices.length){ rows.innerHTML = '<tr><td colspan="9">Waiting for ESP32 devices...</td></tr>'; return; }
+  if(!data.devices.length){ rows.innerHTML = '<tr><td colspan="10">Waiting for ESP32 devices...</td></tr>'; return; }
   rows.innerHTML = data.devices.map(d => `
     <tr>
       <td><span class="dot ${d.online?'on':'off'}"></span>${d.online?'Online':'Offline'}${d.statusError ? '<br><small>'+esc(d.statusError)+'</small>' : ''}</td>
+      <td>
+        <form class="deviceIdForm" onsubmit="event.preventDefault(); assignDeviceId('${encodeURIComponent(d.key)}', this)">
+          <input class="deviceId" name="id" type="number" min="1" max="16" required value="${d.id || ''}" placeholder="1-16">
+          <button>${d.id ? 'Change' : 'Assign'}</button>
+        </form>
+        <small>${d.id ? 'IP .'+(100 + Number(d.id)) : 'Unassigned'}</small>
+      </td>
       <td><b>${esc(d.name)}</b><br><small>${esc(d.mac || d.chip || d.key)}</small></td>
       <td><a href="${esc(d.url)}" target="_blank">${esc(d.ip)}</a><br><small>${esc(d.host)}</small></td>
       <td>${esc(d.firmware || '-')}<br><small>${esc(d.ssid || '')}</small></td>
@@ -154,13 +171,15 @@ async function refresh(force=false){
       </td>
       <td>
         Scale: ${d.hasScale ? 'yes' : 'no'}<br>
-        Jelly: ${d.isJelly ? 'yes' : 'no'}
+        Jelly: ${d.isJelly ? 'yes' : 'no'}<br>
+        Big: ${d.isBig ? 'yes' : 'no'}
       </td>
       <td>${esc(d.lastSeenAgo)}s</td>
       <td class="actions">
           <form onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/config', this)">
             <label><input type="checkbox" name="hasScale" ${d.hasScale ? 'checked' : ''}> Scale</label>
             <label><input type="checkbox" name="isJelly" ${d.isJelly ? 'checked' : ''}> Jelly</label>
+            <label><input type="checkbox" name="isBig" ${d.isBig ? 'checked' : ''}> Big</label>
             <button>Save config</button>
           </form>
           <form onsubmit="event.preventDefault(); postForm('/api/device/${encodeURIComponent(d.key)}/pattern', this)">

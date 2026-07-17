@@ -40,7 +40,6 @@ void fsSegmentForPos(int p, int* seg, float* t) {
     *seg = FS_SEG_OUTER; *t = (p - FS_INNER_LEDS - FS_BELL_LEDS) / (float)(FS_OUTER_LEDS - 1);
   }
 }
-
 // Smooth 0..1 inner->outer blend, eased across the inner/bell boundary so a
 // slightly-off physical tentacle length never shows a hard-cut seam.
 float fsInnerOuterMix(int p) {
@@ -58,18 +57,17 @@ void ledsTick() {
     drawFrame();
   }
 }
-
 void drawFrame() {
   if (isJelly) {
     if (currentPattern == "demo") {
       demo();
     } else if (currentPattern == "ripple") {
-      if (_ledFrame%900==0) {
+      if (_ledFrame%5000==0) {
         point.x = random(-200,200)/100.0f;
         point.y = random(-200,50)/100.0f;
         point.z = random(-200,200)/100.0f;
       }
-      rippleOutFromPoint(point, _ledFrame%900, RgbColor(255,255,0));
+      rippleOutFromPoint(point, _ledFrame%5000, RgbColor(0,0,255));
     } else if (currentPattern == "colorwheel") {
       showColorWheelAcrossEightStrips();
     } else if (currentPattern == "bottomfill") {
@@ -86,6 +84,10 @@ void drawFrame() {
       fallingRain();
     } else if (currentPattern == "movementSimulation") {
       movementSimulation();
+    } else if (currentPattern == "sparkle") {
+      sparkle();
+    } else if (currentPattern == "crazy") {
+      crazy();
     } else if (currentPattern == "innerSpreadWave") {
       innerSpreadWave();
     } else if (currentPattern == "rainbowWave") {
@@ -141,26 +143,55 @@ void showLEDs() {
 
 // For load cells
 void weightUpdate() {
-  _agitation += abs(_weight - _lastWeight) + 0.01;
+  _agitation += abs(_weight - _lastWeight) + 0.01; //Agitation rises whenever weight rises or falls
   _lastWeight = _weight;
   _agitation *= 0.99;
-  if (_calmness > 1000/_agitation) {
+  if (_calmness > 1000/_agitation) {                 //Calmness drifts towards a level determined by agitation, but it rises very slowly but falls quite quickly
       _calmness = 0.95*_calmness + 50/_agitation;
   } else {
       _calmness = 0.999*_calmness + 1/_agitation;
   }
+  /*
   logPrint("Weight: ");
   logPrint(_weight);
   logPrint("   Agitation: ");
   logPrint(_agitation);
   logPrint("   Calmness: ");
-  logPrintln(_calmness);
+  logPrintln(_calmness); */
 }
 
-// Helper: convert a hue wheel position (0-255) into RGB via NeoPixelBus HslColor.
-RgbColor wheel(uint8_t pos) {
-  float hue = (255 - (pos % 256)) / 255.0f;
-  return RgbColor(HslColor(hue, 1.0f, 0.5f));
+void updateLocalScaleState() {
+  if (!hasScale) return;
+
+  unsigned long now = millis();
+  if (now - lastScaleSampleMs < SCALE_SAMPLE_INTERVAL_MS) return;
+  lastScaleSampleMs = now;
+
+  if (!scale.is_ready()) return;
+
+  float rawWeight = scale.get_units(1);
+
+  if (localWeightSmooth == 0.0f) {
+    localWeightSmooth = rawWeight;
+  }
+
+  float previousSmooth = localWeightSmooth;
+
+  localWeightSmooth =
+    previousSmooth + (rawWeight - previousSmooth) * SCALE_SMOOTHING;
+
+  localWeight = localWeightSmooth;
+
+  float movement = fabs(localWeightSmooth - previousSmooth);
+
+  // Tune this divisor based on your expected kg/gram noise and movement.
+  // Smaller number = more sensitive agitation.
+  float instantAgitation = constrain(movement / 0.08f, 0.0f, 1.0f);
+
+  localAgitation =
+    localAgitation + (instantAgitation - localAgitation) * AGITATION_SMOOTHING;
+
+  localCalmness = constrain(1.0f - localAgitation, 0.0f, 1.0f);
 }
 
 //Get position in the plane along one strip of a small jellyfish

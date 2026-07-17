@@ -26,8 +26,26 @@ const int HX711_SCK  = 13;
 constexpr unsigned long HX711_READY_TIMEOUT_MS = 1500;
 
 // ── Wi-Fi ───────────────────────────────────────────────────────
+constexpr uint8_t MIN_DEVICE_ID = 1;
+constexpr uint8_t MAX_DEVICE_ID = 16;
+
+// Temporary provisioning address used while deviceId is still 0.
+// Only power/configure one unassigned device at a time.
+constexpr uint8_t UNASSIGNED_IP_OCTET = 200;
+
 const unsigned long WIFI_CONNECT_TIMEOUT_MS = 5000;
 const unsigned long WIFI_RETRY_INTERVAL_MS  = 1000000;
+
+// ── scales ───────────────────────────────────────────────────────
+const int MAX_SCALE_PEERS = 16;
+
+const unsigned long SCALE_BROADCAST_INTERVAL_MS = 100;
+const unsigned long SCALE_PEER_TIMEOUT_MS = 3000;
+
+const unsigned long SCALE_SAMPLE_INTERVAL_MS = 40;
+
+const float SCALE_SMOOTHING = 0.08f;
+const float AGITATION_SMOOTHING = 0.15f;
 
 // ── UDP ports ───────────────────────────────────────────────────
 const int MUSIC_UDP_PORT = 4210;

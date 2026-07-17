@@ -33,8 +33,27 @@ bool tryConnectSingleWiFi(const char* ssid, const char* password) {
 
   WiFi.disconnect(true, true);
   delay(100);
+
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(deviceName.c_str());
+
+  IPAddress localIp = getDeviceIpAddress();
+  IPAddress gateway(192, 168, 0, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  IPAddress dns1(0, 0, 0, 0);
+  IPAddress dns2(0, 0, 0, 0);
+
+  if (!WiFi.config(localIp, gateway, subnet, dns1, dns2)) {
+    logPrintln("Static IP configuration failed");
+    return false;
+  }
+
+  logPrintf(
+    "Device ID %u, requesting static IP %s\n",
+    deviceId,
+    localIp.toString().c_str()
+  );
+
   WiFi.begin(ssid, password);
 
   unsigned long start = millis();
@@ -85,6 +104,13 @@ void startMDNSIfNeeded() {
     MDNS.addServiceTxt("esp32art", "tcp", "chip", chipIdHex.c_str());
     MDNS.addServiceTxt("esp32art", "tcp", "mac", getMacAddressString().c_str());
     MDNS.addServiceTxt("esp32art", "tcp", "ssid", currentSSID.c_str());
+    String deviceIdText = String(deviceId);
+    MDNS.addServiceTxt(
+      "esp32art",
+      "tcp",
+      "id",
+      deviceIdText.c_str()
+);
 
     logPrintf("mDNS started: http://%s.local\n", deviceName.c_str());
   } else {
@@ -136,6 +162,60 @@ void setupScaleUdp() {
   logPrintf("Scale UDP listening on port %d\n", SCALE_UDP_PORT);
 }
 
+void handleScaleUdp() {
+  int packetSize = scaleUdp.parsePacket();
+  if (!packetSize) return;
+
+  char packet[192];
+  int len = scaleUdp.read(packet, sizeof(packet) - 1);
+  if (len <= 0) return;
+  packet[len] = '\0';
+
+  char kind[12];
+  char chip[24];
+  char name[40];
+  float weight;
+  float agitation;
+  float calmness;
+  unsigned long remoteMs;
+
+  int matched = sscanf(
+    packet,
+    "%11[^,],%23[^,],%39[^,],%f,%f,%f,%lu",
+    kind,
+    chip,
+    name,
+    &weight,
+    &agitation,
+    &calmness,
+    &remoteMs
+  );
+
+  if (matched != 7) return;
+  if (String(kind) != "scale") return;
+
+  String peerChip = String(chip);
+
+  // Ignore our own broadcast.
+  if (peerChip == chipIdHex) return;
+
+  int idx = findScalePeerByChip(peerChip);
+  if (idx < 0) {
+    idx = findFreeScalePeerSlot();
+  }
+
+  scalePeers[idx].active = true;
+  scalePeers[idx].chip = peerChip;
+  scalePeers[idx].name = String(name);
+  scalePeers[idx].ip = scaleUdp.remoteIP();
+
+  scalePeers[idx].weight = weight;
+  scalePeers[idx].agitation = constrain(agitation, 0.0f, 1.0f);
+  scalePeers[idx].calmness = constrain(calmness, 0.0f, 1.0f);
+
+  scalePeers[idx].lastSeenMs = millis();
+}
+
 // ── Web server + OTA 
 
 String htmlEscape(const String& in) {
@@ -153,42 +233,125 @@ String wifiStatusText() {
   return "Not connected";
 }
 
-/*
-// ── Send number to the other device ───────────────────────────────────────────
-bool sendNumberToPeer(const String& host, float value) {
-  if (WiFi.status() != WL_CONNECTED) {
-    lastSendStatus = "Wi-Fi not connected";
-    return false;
+int findScalePeerByChip(const String& chip) {
+  for (int i = 0; i < MAX_SCALE_PEERS; i++) {
+    if (scalePeers[i].active && scalePeers[i].chip == chip) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int findFreeScalePeerSlot() {
+  for (int i = 0; i < MAX_SCALE_PEERS; i++) {
+    if (!scalePeers[i].active) {
+      return i;
+    }
   }
 
-  WiFiClient client;
-  HTTPClient http;
-
-  String url = "http://" + host + "/setNumber";
-  if (!http.begin(client, url)) {
-    lastSendStatus = "Failed to begin HTTP request";
-    return false;
+  // If full, overwrite the stalest peer.
+  int oldest = 0;
+  for (int i = 1; i < MAX_SCALE_PEERS; i++) {
+    if (scalePeers[i].lastSeenMs < scalePeers[oldest].lastSeenMs) {
+      oldest = i;
+    }
   }
+  return oldest;
+}
 
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  String body = "value=" + String(value);
+void expireScalePeers() {
+  unsigned long now = millis();
 
-  int code = http.POST(body);
-  String response = http.getString();
-  http.end();
+  for (int i = 0; i < MAX_SCALE_PEERS; i++) {
+    if (!scalePeers[i].active) continue;
 
-  //logPrintf("POST %s -> %d\n", url.c_str(), code);
-  //logPrintln(response);
-
-  if (code >= 200 && code < 300) {
-    lastSendStatus = "Sent " + String(value) + " to " + host;
-    return true;
-  } else {
-    lastSendStatus = "Send failed, HTTP " + String(code);
-    return false;
+    if (now - scalePeers[i].lastSeenMs > SCALE_PEER_TIMEOUT_MS) {
+      scalePeers[i].active = false;
+    }
   }
 }
-*/
+
+int getActiveScaleCount() {
+  int count = 0;
+
+  for (int i = 0; i < MAX_SCALE_PEERS; i++) {
+    if (scalePeers[i].active) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+int getTotalActiveScaleCount() {
+  return getActiveScaleCount() + (hasScale ? 1 : 0);
+}
+
+void broadcastScaleState() {
+  if (!hasScale) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  unsigned long now = millis();
+  if (now - lastScaleBroadcastMs < SCALE_BROADCAST_INTERVAL_MS) return;
+  lastScaleBroadcastMs = now;
+
+  IPAddress broadcastIp(255, 255, 255, 255);
+
+  String packet;
+  packet.reserve(160);
+
+  // Format:
+  // scale,<chip>,<name>,<weight>,<agitation>,<calmness>,<ms>
+  packet += "scale,";
+  packet += chipIdHex;
+  packet += ",";
+  packet += deviceName;
+  packet += ",";
+  packet += String(localWeight, 3);
+  packet += ",";
+  packet += String(localAgitation, 3);
+  packet += ",";
+  packet += String(localCalmness, 3);
+  packet += ",";
+  packet += String(now);
+
+  scaleUdp.beginPacket(broadcastIp, SCALE_UDP_PORT);
+  scaleUdp.write((const uint8_t*)packet.c_str(), packet.length());
+  scaleUdp.endPacket();
+}
+
+bool isValidDeviceId(int id) {
+  return id >= MIN_DEVICE_ID && id <= MAX_DEVICE_ID;
+}
+
+uint8_t getDeviceIpOctet() {
+  if (isValidDeviceId(deviceId)) {
+    return 100 + deviceId;
+  }
+
+  // Temporary address before an ID has been assigned.
+  return UNASSIGNED_IP_OCTET;
+}
+
+IPAddress getDeviceIpAddress() {
+  return IPAddress(192, 168, 0, getDeviceIpOctet());
+}
+
+void saveDeviceId(uint8_t newId) {
+  if (!isValidDeviceId(newId)) {
+    return;
+  }
+
+  prefs.begin("device", false);
+  prefs.putUChar("id", newId);
+  prefs.end();
+
+  deviceId = newId;
+
+  // Your animation code uses zero-based jelly IDs.
+  _jellyId = deviceId - 1;
+}
+
 
 String buildHtmlPage(const String& message = "") {
   String html;
@@ -275,6 +438,7 @@ void handleRename() {
 
 void handleStatus() {
   String json = "{";
+  json += "\"id\":" + String(deviceId) + ",";
   json += "\"name\":\"" + deviceName + "\",";
   json += "\"firmware\":\"" FW_VERSION "\",";
   json += "\"chip\":\"" + chipIdHex + "\",";
@@ -285,9 +449,14 @@ void handleStatus() {
   //json += "\"number\":" + String(_agitation) + ",";
   json += "\"hasScale\":" + String(hasScale ? "true" : "false") + ",";
   json += "\"isJelly\":" + String(isJelly ? "true" : "false") + ",";
+  json += "\"isBig\":" + String(isBig ? "true" : "false") + ",";
   json += "\"pattern\":\"" + currentPattern + "\",";
   //json += "\"hasNumber\":" + String(hasReceivedNumber ? "true" : "false");
-  json += "\"posX\":" + String(devicePos.x) + ",";
+  json += "\"localWeight\":" + String(localWeight, 3);
+  json += ",\"localAgitation\":" + String(localAgitation, 3);
+  json += ",\"localCalmness\":" + String(localCalmness, 3);
+  json += ",\"activeScales\":" + String(getTotalActiveScaleCount());
+  json += ",\"posX\":" + String(devicePos.x) + ",";
   json += "\"posY\":" + String(devicePos.y) + ",";
   json += "\"posZ\":" + String(devicePos.z);
   json += "}";
@@ -342,6 +511,7 @@ void handleLog() {
 void handleConfig() {
   bool newHasScale = hasScale;
   bool newIsJelly = isJelly;
+  bool newIsBig = isBig;
 
   if (server.hasArg("hasScale")) {
     String v = server.arg("hasScale");
@@ -353,11 +523,17 @@ void handleConfig() {
     newIsJelly = (v == "1" || v == "true" || v == "on");
   }
 
-  saveDeviceConfig(newHasScale, newIsJelly);
+  if (server.hasArg("isBig")) {
+    String v = server.arg("isBig");
+    newIsBig = (v == "1" || v == "true" || v == "on");
+  }
+
+  saveDeviceConfig(newHasScale, newIsJelly, newIsBig);
 
   server.send(200, "application/json",
     String("{\"ok\":true,\"hasScale\":") + (hasScale ? "true" : "false") +
-    ",\"isJelly\":" + (isJelly ? "true" : "false") + "}"
+    ",\"isJelly\":" + (isJelly ? "true" : "false") +
+    ",\"isBig\":" + (isBig ? "true" : "false") + "}"
   );
 }
 
@@ -397,6 +573,45 @@ void handlePosition() {
   );
 }
 
+void handleDeviceId() {
+  if (!server.hasArg("id")) {
+    server.send(
+      400,
+      "application/json",
+      "{\"ok\":false,\"error\":\"Missing 'id' field\"}"
+    );
+    return;
+  }
+
+  int requestedId = server.arg("id").toInt();
+
+  if (!isValidDeviceId(requestedId)) {
+    server.send(
+      400,
+      "application/json",
+      String("{\"ok\":false,\"error\":\"ID must be between ") +
+      MIN_DEVICE_ID + " and " + MAX_DEVICE_ID + "\"}"
+    );
+    return;
+  }
+
+  saveDeviceId((uint8_t)requestedId);
+
+  IPAddress newIp = getDeviceIpAddress();
+
+  String json = "{";
+  json += "\"ok\":true,";
+  json += "\"id\":" + String(deviceId) + ",";
+  json += "\"ip\":\"" + newIp.toString() + "\",";
+  json += "\"rebooting\":true";
+  json += "}";
+
+  server.send(200, "application/json", json);
+
+  delay(500);
+  ESP.restart();
+}
+
 void setupWebServer() {
   if (webServerStarted) return;
 
@@ -411,6 +626,7 @@ void setupWebServer() {
   server.on("/config", HTTP_POST, handleConfig);
   server.on("/pattern", HTTP_POST, handlePattern);
   server.on("/position", HTTP_POST, handlePosition);
+  server.on("/device-id", HTTP_POST, handleDeviceId);
 
   server.on("/update", HTTP_POST, []() {
     bool ok = !Update.hasError();

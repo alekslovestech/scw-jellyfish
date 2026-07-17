@@ -10,6 +10,8 @@
 #include "config.h"
 #include "HX711.h"
 
+// ID 0 means "not configured yet".
+uint8_t deviceId = 0;
 
 using StripBus = NeoPixelBus<NeoBrgFeature, NeoEsp32LcdX8Ws2812xMethod>;
 
@@ -30,7 +32,31 @@ HX711 scale;
 float calibration_factor = -14850;
 bool hasScale = false;
 bool isJelly = false;
+bool isBig = false;
 String currentPattern = "demo";   // heartbeat | demo | ripple | fireSpread | waterfall | twoToneDiffuse | fallingRain | movementSimulation | innerSpreadWave | rainbowWave
+
+float localWeight = 0.0f;
+float localWeightSmooth = 0.0f;
+float localAgitation = 0.0f;
+float localCalmness = 1.0f;
+
+unsigned long lastScaleSampleMs = 0;
+unsigned long lastScaleBroadcastMs = 0;
+
+struct ScalePeer {
+  bool active;
+  String chip;
+  String name;
+  IPAddress ip;
+
+  float weight;
+  float agitation;
+  float calmness;
+
+  unsigned long lastSeenMs;
+};
+
+ScalePeer scalePeers[MAX_SCALE_PEERS];
 
 // Defined here (concatenated first) so fireSpread.ino sees them — variables, unlike
 // functions, are not auto-prototyped across the sketch's alphabetical tab order.
@@ -129,14 +155,25 @@ String sanitizeDeviceName(String name) {
 
 void loadIdentity() {
   chipIdHex = getChipIdHex();
+
   prefs.begin("device", false);
+
+  deviceId = prefs.getUChar("id", 0);
   deviceName = prefs.getString("name", "");
+
   if (deviceName.length() == 0) {
     deviceName = "esp-" + chipIdHex.substring(chipIdHex.length() - 6);
     deviceName.toLowerCase();
     prefs.putString("name", deviceName);
   }
+
   prefs.end();
+
+  if (isValidDeviceId(deviceId)) {
+    _jellyId = deviceId - 1;
+  } else {
+    _jellyId = 0;
+  }
 }
 
 void saveDeviceName(const String& newName) {
@@ -151,6 +188,7 @@ void loadDeviceConfig() {
   prefs.begin("config", false);
   hasScale = prefs.getBool("hasScale", false);
   isJelly  = prefs.getBool("isJelly", false);
+  isBig = prefs.getBool("isBig, false");
   currentPattern = prefs.getString("pattern", "demo");
   devicePos.x = prefs.getFloat("posX", 0.0);
   devicePos.y = prefs.getFloat("posY", 0.0);
@@ -158,14 +196,16 @@ void loadDeviceConfig() {
   prefs.end();
 }
 
-void saveDeviceConfig(bool newHasScale, bool newIsJelly) {
+void saveDeviceConfig(bool newHasScale, bool newIsJelly, bool newIsBig) {
   prefs.begin("config", false);
   prefs.putBool("hasScale", newHasScale);
   prefs.putBool("isJelly", newIsJelly);
+  prefs.putBool("isBig", newIsBig);
   prefs.end();
 
   hasScale = newHasScale;
   isJelly = newIsJelly;
+  isBig = newIsBig;
 }
 
 void savePattern(const String& p) {
@@ -232,6 +272,9 @@ void setup() {
   logPrint("Config isJelly: ");
   logPrintln(isJelly ? "true" : "false");
 
+  logPrint("Config isBig: ");
+  logPrintln(isBig ? "true" : "false");
+
   logPrint("Device position: ");
   logPrint(devicePos.x);
   logPrint(", ");
@@ -291,6 +334,11 @@ void loop() {
 
   ensureWiFi();
   handleMusicUdp();
+
+  updateLocalScaleState();
+  broadcastScaleState();
+  handleScaleUdp();
+  expireScalePeers();
 
   if (identifyRequested) {
     identifyRequested = false;

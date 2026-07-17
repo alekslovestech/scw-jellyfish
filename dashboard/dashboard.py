@@ -30,6 +30,22 @@ REQUEST_TIMEOUT_SECONDS = 2.0
 DEVICES: dict[str, Device] = {}
 
 
+def get_device_id(d: Device) -> int:
+    """Return the permanent fleet ID, or 0 while unassigned/unknown."""
+    try:
+        return int(getattr(d, "device_id", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def set_device_id(d: Device, value: Any) -> None:
+    """Store a device ID without requiring an immediate Device class change."""
+    try:
+        setattr(d, "device_id", int(value))
+    except (TypeError, ValueError):
+        pass
+
+
 def decode_txt(properties: dict[bytes, bytes | None]) -> dict[str, str]:
     out: dict[str, str] = {}
     for k, v in properties.items():
@@ -75,6 +91,8 @@ class ESPListener(ServiceListener):
         d.chip = txt.get("chip", d.chip)
         d.firmware = txt.get("fw", d.firmware)
         d.ssid = txt.get("ssid", d.ssid)
+        if "id" in txt:
+            set_device_id(d, txt["id"])
         if "rssi" in txt:
             try:
                 d.rssi = int(txt["rssi"])
@@ -137,8 +155,11 @@ async def poll_device(client: httpx.AsyncClient, d: Device) -> None:
         d.chip = data.get("chip", d.chip)
         d.firmware = data.get("firmware", d.firmware)
         d.ssid = data.get("ssid", d.ssid)
+        if data.get("id") is not None:
+            set_device_id(d, data.get("id"))
         d.has_scale = bool(data.get("hasScale", d.has_scale))
         d.is_jelly = bool(data.get("isJelly", d.is_jelly))
+        d.is_big = bool(data.get("isBig", d.is_big))
         d.pattern = data.get("pattern", d.pattern)
         d.posX = float(data.get("posX", d.posX))
         d.posY = float(data.get("posY", d.posY))
@@ -166,7 +187,22 @@ async def index() -> FileResponse:
 
 @app.get("/api/devices")
 async def api_devices() -> dict[str, Any]:
-    return {"devices": sorted([d.as_dict() for d in DEVICES.values()], key=lambda x: x["name"])}
+    devices: list[dict[str, Any]] = []
+
+    for d in DEVICES.values():
+        item = d.as_dict()
+        item["id"] = get_device_id(d)
+        devices.append(item)
+
+    # Assigned devices first in numerical order; unassigned devices last.
+    devices.sort(
+        key=lambda x: (
+            x.get("id", 0) == 0,
+            x.get("id", 0) if x.get("id", 0) else 999,
+            str(x.get("name", "")).lower(),
+        )
+    )
+    return {"devices": devices}
 
 
 @app.get("/api/device/{key}/log", response_model=None)
@@ -205,11 +241,69 @@ async def api_rename(key: str, name: str = Form(...)):
     d.name = name
     return {"ok": r.status_code < 300, "http": r.status_code}
 
+
+
+@app.post("/api/device/{key}/device-id", response_model=None)
+async def api_device_id(key: str, id: int = Form(...)):
+    """Assign the ESP's permanent ID; the ESP saves it and then reboots."""
+    d = get_device_or_404(key)
+    if isinstance(d, JSONResponse):
+        return d
+
+    if not 1 <= id <= 16:
+        return JSONResponse(
+            {"ok": False, "error": "ID must be between 1 and 16"},
+            status_code=400,
+        )
+
+    # Prevent accidental duplicate IDs among devices already known to the dashboard.
+    conflict = next(
+        (other for other in DEVICES.values() if other is not d and get_device_id(other) == id),
+        None,
+    )
+    if conflict is not None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": f"ID {id} is already assigned to {conflict.name}",
+            },
+            status_code=409,
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
+            r = await client.post(f"{d.base_url}/device-id", data={"id": str(id)})
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    ok = r.status_code < 300
+    response_body: dict[str, Any] = {}
+    try:
+        response_body = r.json()
+    except Exception:
+        pass
+
+    if ok:
+        set_device_id(d, response_body.get("id", id))
+        d.ip = response_body.get("ip", f"192.168.0.{100 + id}")
+        d.online = False  # It is rebooting and will be rediscovered/polled shortly.
+        d.status_error = "Rebooting after device ID change"
+
+    return {
+        "ok": ok,
+        "http": r.status_code,
+        "id": get_device_id(d),
+        "ip": d.ip,
+        "body": r.text[:300],
+    }
+
+
 @app.post("/api/device/{key}/config", response_model=None)
 async def api_config(
     key: str,
     hasScale: bool = Form(False),
     isJelly: bool = Form(False),
+    isBig: bool = Form(False),
 ):
     d = get_device_or_404(key)
     if isinstance(d, JSONResponse):
@@ -221,12 +315,14 @@ async def api_config(
             data={
                 "hasScale": "1" if hasScale else "0",
                 "isJelly": "1" if isJelly else "0",
+                "isBig": "1" if isBig else "0",
             },
         )
 
     if r.status_code < 300:
         d.has_scale = hasScale
         d.is_jelly = isJelly
+        d.is_big = isBig
 
     return {"ok": r.status_code < 300, "http": r.status_code, "body": r.text[:200]}
 
