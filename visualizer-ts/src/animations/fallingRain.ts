@@ -28,6 +28,7 @@ function getVertPos(group: string, t: number): number {
 
 export const fallingRain: LEDAnimation = {
   name: "fallingRain",
+  colorMode: "two",
 
   update(leds: LED[], time: number) {
     for (const led of leds) {

@@ -1,5 +1,7 @@
-import { LEDAnimation } from "./animations/types";
-import { waveCascade } from "./animations/waveCascade";
+// NOTE: config.ts is a low-level module imported by almost everything (ledMap,
+// every animation). It must NOT import an animation, or it forms a cycle
+// (config → animation → ledMap → config) that reads `cfg` before it's defined.
+// The default/base animation is chosen in main.ts instead.
 
 // Physical LED strip layout — standard jellyfish (jellies 1–12)
 export interface HardwareConfig {
@@ -53,6 +55,37 @@ export interface ColorsConfig {
   dots: number;
 }
 
+// Two-colour palette for the movementSimulation base (inner tips → outer tips).
+// Values are normalised 0–1 RGB (so 255 = 1.0), used directly by the animation.
+// The panel binds a colour picker in float mode. Editable live — no rebuild.
+export interface RGB01 {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface PaletteConfig {
+  inner: RGB01; // colour at the inner tentacle tips
+  outer: RGB01; // colour at the outer tentacle tips
+}
+
+// Three-colour gradient for the fireSteady base (over a fixed white hot core):
+//   c1 near the base → c2 mid → c3 at the tips. Default yellow→orange→red = fire;
+//   retune toward green or blue to match fireSpread's later palettes.
+export interface FirePaletteConfig {
+  c1: RGB01;
+  c2: RGB01;
+  c3: RGB01;
+}
+
+// Master per-segment brightness (0–1), applied to every animation as the final
+// step after the base + effects. `inner` scales the inner tentacles; `outer`
+// scales the outer tentacles and the bell together.
+export interface BrightnessConfig {
+  inner: number;
+  outer: number;
+}
+
 export interface LightingConfig {
   ambient_color: number;
   ambient_intensity: number;
@@ -63,13 +96,15 @@ export interface LightingConfig {
 }
 
 export interface Config {
-  animation: LEDAnimation;
   hardware: HardwareConfig;
   jelly0: Jelly0HardwareConfig;
   bell: BellConfig;
   tentacle: TentacleConfig;  // outer tentacle geometry
   inner: InnerConfig;        // inner tentacle geometry
   colors: ColorsConfig;
+  palette: PaletteConfig;
+  firePalette: FirePaletteConfig;
+  brightness: BrightnessConfig;
   lighting: LightingConfig;
   size_ratio: number; // scale factor per level (e.g. 0.6 → each level is 60% of previous)
   z_offset: number; // Z step between levels; level N sits at N * z_offset
@@ -118,6 +153,19 @@ export const cfg: Config = {
     inner: 0x88ccff,
     dots: 0x9900ff,
   },
+  palette: {
+    inner: { r: 1, g: 0.5, b: 0 }, // orange — inner tips
+    outer: { r: 0, g: 1, b: 0 },   // green — outer tips
+  },
+  firePalette: {
+    c1: { r: 1, g: 1, b: 0 },   // yellow — near the base
+    c2: { r: 1, g: 0.2, b: 0 }, // orange — mid
+    c3: { r: 1, g: 0, b: 0 },   // red — tips
+  },
+  brightness: {
+    inner: 1, // full brightness by default
+    outer: 1,
+  },
   lighting: {
     ambient_color: 0x334455,
     ambient_intensity: 8.0,
@@ -126,7 +174,6 @@ export const cfg: Config = {
     fill_color: 0x223366,
     fill_intensity: 60,
   },
-  animation: waveCascade,
   size_ratio: 0.6,
   z_offset: -3.0,
   orbital_radius: 8.0,
