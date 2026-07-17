@@ -6,11 +6,20 @@
 // pin table, …) stays with the code that owns it.
 
 // ── LED layout ──────────────────────────────────────────────────
-constexpr uint16_t NUM_LEDS_PER_STRIP = 50;
+constexpr uint16_t NUM_SHORT_STRIPS = 8;
+constexpr uint16_t NUM_LONG_STRIPS  = 4;
+constexpr uint16_t NUM_STRIPS       = NUM_SHORT_STRIPS + NUM_LONG_STRIPS;
+
+constexpr uint16_t NUM_LEDS_PER_STRIP      = 50;
 constexpr uint16_t NUM_LEDS_PER_LONG_STRIP = 100;
-constexpr uint16_t NUM_STRIPS         = 12;
 const uint8_t      MAX_BRIGHTNESS      = 128;   // 0-255, global LED brightness cap
 const float        UPDATE_INTERVAL_MS  = 10;    // ms between LED frames
+
+constexpr uint8_t PINS[NUM_STRIPS] = {
+    4, 5, 6, 7,
+    9, 10, 11, 12,
+    15, 16, 17, 18
+};
 
 // ── Ported-animation segment layout (fireSpread / waterfall / twoToneDiffuse) ──
 // Along one strip, confirmed on hardware: inner 0-35, bell 36-39, outer 40-49.

@@ -57,6 +57,7 @@ void ledsTick() {
     drawFrame();
   }
 }
+
 void drawFrame() {
   if (isJelly) {
     if (currentPattern == "demo") {
@@ -135,10 +136,22 @@ void rotate()
 
 // Helpers
 
-void showLEDs() {
-  for (int s = 0; s < 8; s++) {
-    strips[s].Show();
-  }
+void showLEDs()
+{
+    const uint8_t count = activeStripCount();
+
+    for (uint8_t s = 0; s < count; s++) {
+        strips[s].Show();
+    }
+}
+
+const Pos3D& getLedPosition(uint8_t stripIndex, uint16_t pixelIndex)
+{
+    if (stripIndex < NUM_SHORT_STRIPS) {
+        return ledPos[stripIndex][pixelIndex];
+    }
+
+    return ledPosLong[stripIndex - NUM_SHORT_STRIPS][pixelIndex];
 }
 
 // For load cells

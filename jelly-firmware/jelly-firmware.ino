@@ -78,30 +78,23 @@ struct Pos3D {
 struct Pos3D devicePos = {0.0f, 0.0f, 0.0f};
 
 //positions of (num of strips * number of leds)
-struct Pos3D ledPos[8][NUM_LEDS_PER_STRIP];
-struct Pos3D ledPosLong[4][NUM_LEDS_PER_LONG_STRIP];
+struct Pos3D ledPos[NUM_SHORT_STRIPS][NUM_LEDS_PER_STRIP];
+struct Pos3D ledPosLong[NUM_LONG_STRIPS][NUM_LEDS_PER_LONG_STRIP];
 
+StripBus strips[NUM_STRIPS] = {
+    {NUM_LEDS_PER_STRIP,      PINS[0]},
+    {NUM_LEDS_PER_STRIP,      PINS[1]},
+    {NUM_LEDS_PER_STRIP,      PINS[2]},
+    {NUM_LEDS_PER_STRIP,      PINS[3]},
+    {NUM_LEDS_PER_STRIP,      PINS[4]},
+    {NUM_LEDS_PER_STRIP,      PINS[5]},
+    {NUM_LEDS_PER_STRIP,      PINS[6]},
+    {NUM_LEDS_PER_STRIP,      PINS[7]},
 
-int PINS[NUM_STRIPS] = {
-  4,5,6,7,9,10,11,12,15,16,17,18
-}; // consider skipping pin 8
-StripBus strips[] = {
-  {NUM_LEDS_PER_STRIP, PINS[0]},
-  {NUM_LEDS_PER_STRIP, PINS[1]},
-  {NUM_LEDS_PER_STRIP, PINS[2]},
-  {NUM_LEDS_PER_STRIP, PINS[3]},
-  {NUM_LEDS_PER_STRIP, PINS[4]},
-  {NUM_LEDS_PER_STRIP, PINS[5]},
-  {NUM_LEDS_PER_STRIP, PINS[6]},
-  {NUM_LEDS_PER_STRIP, PINS[7]},
-  {NUM_LEDS_PER_STRIP, PINS[8]},
-  {NUM_LEDS_PER_STRIP, PINS[9]},
-  {NUM_LEDS_PER_STRIP, PINS[10]},
-  {NUM_LEDS_PER_STRIP, PINS[11]},
- // {NUM_LEDS_PER_STRIP, PINS[12]},
- // {NUM_LEDS_PER_STRIP, PINS[13]},
- // {NUM_LEDS_PER_STRIP, PINS[14]},
- // {NUM_LEDS_PER_STRIP, PINS[15]},
+    {NUM_LEDS_PER_LONG_STRIP, PINS[8]},
+    {NUM_LEDS_PER_LONG_STRIP, PINS[9]},
+    {NUM_LEDS_PER_LONG_STRIP, PINS[10]},
+    {NUM_LEDS_PER_LONG_STRIP, PINS[11]}
 };
 
 WebServer server(80);
@@ -226,6 +219,27 @@ void saveDevicePos(Pos3D pos) {
   prefs.end();
 
   devicePos = pos;
+}
+
+uint8_t activeStripCount()
+{
+    return isBig ? NUM_STRIPS : NUM_SHORT_STRIPS;
+}
+
+void setupStrips()
+{
+    const uint8_t count = activeStripCount();
+
+    for (uint8_t s = 0; s < count; s++) {
+        strips[s].Begin();
+        strips[s].ClearTo(RgbColor(0));
+    }
+
+    // Calling Show() on every initialized member completes
+    // the parallel-group update.
+    for (uint8_t s = 0; s < count; s++) {
+        strips[s].Show();
+    }
 }
 
 bool initScaleWithTimeout(unsigned long timeoutMs) {
