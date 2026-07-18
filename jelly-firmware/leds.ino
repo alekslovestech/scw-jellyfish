@@ -154,6 +154,22 @@ const Pos3D& getLedPosition(uint8_t stripIndex, uint16_t pixelIndex)
     return ledPosLong[stripIndex - NUM_SHORT_STRIPS][pixelIndex];
 }
 
+// Return this LED's position in the shared/global coordinate system.
+// Local jelly coordinates are first rotated around Y, then translated by devicePos.
+Pos3D getAbsoluteLedPosition(uint8_t stripIndex, uint16_t pixelIndex)
+{
+    const Pos3D& local = getLedPosition(stripIndex, pixelIndex);
+    const float angle = deviceRotationY * DEG_TO_RAD;
+    const float c = cosf(angle);
+    const float s = sinf(angle);
+
+    Pos3D absolute;
+    absolute.x = devicePos.x + c * local.x + s * local.z;
+    absolute.y = devicePos.y + local.y;
+    absolute.z = devicePos.z - s * local.x + c * local.z;
+    return absolute;
+}
+
 // For load cells
 void weightUpdate() {
   _agitation += abs(_weight - _lastWeight) + 0.01; //Agitation rises whenever weight rises or falls

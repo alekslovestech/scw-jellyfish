@@ -164,6 +164,7 @@ async def poll_device(client: httpx.AsyncClient, d: Device) -> None:
         d.posX = float(data.get("posX", d.posX))
         d.posY = float(data.get("posY", d.posY))
         d.posZ = float(data.get("posZ", d.posZ))
+        d.rotationY = float(data.get("rotationY", d.rotationY))
         if data.get("rssi") is not None:
             d.rssi = int(data.get("rssi"))
             d.signal_quality = rssi_quality(d.rssi)
@@ -357,6 +358,7 @@ async def api_position(
     posX: float = Form(...),
     posY: float = Form(...),
     posZ: float = Form(...),
+    rotationY: float = Form(...),
 ):
     d = get_device_or_404(key)
     if isinstance(d, JSONResponse):
@@ -369,6 +371,7 @@ async def api_position(
                 "posX": str(posX),
                 "posY": str(posY),
                 "posZ": str(posZ),
+                "rotationY": str(rotationY),
             },
         )
 
@@ -376,6 +379,7 @@ async def api_position(
         d.posX = posX
         d.posY = posY
         d.posZ = posZ
+        d.rotationY = rotationY
 
     return {"ok": r.status_code < 300, "http": r.status_code, "body": r.text[:200]}
 

@@ -11,7 +11,7 @@
     table{border-collapse:collapse;width:100%;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px #0001}
     th,td{text-align:left;padding:10px;border-bottom:1px solid #eee;vertical-align:middle}th{background:#f0f0f0}
     .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px}.on{background:#19a34a}.off{background:#c22}
-    .actions{display:flex;gap:6px;flex-wrap:wrap}.actions form{display:inline-flex;gap:6px;align-items:center}.small{width:90px}.deviceId{width:58px}.name{width:140px}.loc{width:72px}.locationForm{display:flex;gap:6px;align-items:end;flex-wrap:wrap}.locationForm label{font-size:12px;color:#555}.locationForm input{display:block;margin-top:2px}.log{white-space:pre-wrap;background:#111;color:#eee;padding:12px;border-radius:8px;min-height:40px}.deviceLog{max-height:420px;overflow:auto}.panel{margin-top:20px;background:white;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}.hidden{display:none}.rowbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}.actions form{display:inline-flex;gap:6px;align-items:center}.small{width:90px}.deviceId{width:58px}.name{width:140px}.loc{width:72px}.rotation{width:86px}.locationForm{display:flex;gap:6px;align-items:end;flex-wrap:wrap}.locationForm label{font-size:12px;color:#555}.locationForm input{display:block;margin-top:2px}.log{white-space:pre-wrap;background:#111;color:#eee;padding:12px;border-radius:8px;min-height:40px}.deviceLog{max-height:420px;overflow:auto}.panel{margin-top:20px;background:white;border-radius:12px;padding:14px;box-shadow:0 1px 4px #0001}.hidden{display:none}.rowbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
   </style>
 </head>
 <body>
@@ -166,6 +166,7 @@ async function refresh(force=false){
           <label>X<input class="loc" name="posX" type="number" step="any" value="${esc(d.posX ?? 0)}"></label>
           <label>Y<input class="loc" name="posY" type="number" step="any" value="${esc(d.posY ?? 0)}"></label>
           <label>Z<input class="loc" name="posZ" type="number" step="any" value="${esc(d.posZ ?? 0)}"></label>
+          <label>Y rot. °<input class="rotation" name="rotationY" type="number" step="any" value="${esc(d.rotationY ?? 0)}"></label>
           <button>Save</button>
         </form>
       </td>

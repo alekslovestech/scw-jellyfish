@@ -458,7 +458,8 @@ void handleStatus() {
   json += ",\"activeScales\":" + String(getTotalActiveScaleCount());
   json += ",\"posX\":" + String(devicePos.x) + ",";
   json += "\"posY\":" + String(devicePos.y) + ",";
-  json += "\"posZ\":" + String(devicePos.z);
+  json += "\"posZ\":" + String(devicePos.z) + ",";
+  json += "\"rotationY\":" + String(deviceRotationY);
   json += "}";
 
   server.send(200, "application/json", json);
@@ -551,6 +552,7 @@ void handlePattern() {
 
 void handlePosition() {
   struct Pos3D newPos = devicePos;
+  float newRotationY = deviceRotationY;
 
   if (server.hasArg("posX")) {
     newPos.x = server.arg("posX").toFloat();
@@ -564,12 +566,17 @@ void handlePosition() {
     newPos.z = server.arg("posZ").toFloat();
   }
 
-  saveDevicePos(newPos);
+  if (server.hasArg("rotationY")) {
+    newRotationY = server.arg("rotationY").toFloat();
+  }
+
+  saveDeviceTransform(newPos, newRotationY);
 
   server.send(200, "application/json",
     String("{\"ok\":true,\"posX\":") + String(devicePos.x, 3) +
     ",\"posY\":" + String(devicePos.y, 3) +
-    ",\"posZ\":" + String(devicePos.z, 3) + "}"
+    ",\"posZ\":" + String(devicePos.z, 3) +
+    ",\"rotationY\":" + String(deviceRotationY, 3) + "}"
   );
 }
 

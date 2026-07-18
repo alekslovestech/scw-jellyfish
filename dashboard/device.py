@@ -36,6 +36,7 @@ class Device:
     posX: float = 0.0
     posY: float = 0.0
     posZ: float = 0.0
+    rotationY: float = 0.0
 
     @property
     def base_url(self) -> str:
@@ -69,4 +70,5 @@ class Device:
             "posX": self.posX,
             "posY": self.posY,
             "posZ": self.posZ,
+            "rotationY": self.rotationY,
         }

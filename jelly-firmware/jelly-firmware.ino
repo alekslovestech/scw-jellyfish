@@ -76,6 +76,7 @@ struct Pos3D {
 };
 
 struct Pos3D devicePos = {0.0f, 0.0f, 0.0f};
+float deviceRotationY = 0.0f;  // Degrees around the global Y axis
 
 //positions of (num of strips * number of leds)
 struct Pos3D ledPos[NUM_SHORT_STRIPS][NUM_LEDS_PER_STRIP];
@@ -182,11 +183,12 @@ void loadDeviceConfig() {
   prefs.begin("config", false);
   hasScale = prefs.getBool("hasScale", false);
   isJelly  = prefs.getBool("isJelly", false);
-  isBig = prefs.getBool("isBig, false");
+  isBig = prefs.getBool("isBig", false);
   currentPattern = prefs.getString("pattern", "demo");
   devicePos.x = prefs.getFloat("posX", 0.0);
   devicePos.y = prefs.getFloat("posY", 0.0);
   devicePos.z = prefs.getFloat("posZ", 0.0);
+  deviceRotationY = prefs.getFloat("rotationY", 0.0f);
   prefs.end();
 }
 
@@ -209,16 +211,18 @@ void savePattern(const String& p) {
   currentPattern = p;
 }
 
-void saveDevicePos(Pos3D pos) {
+void saveDeviceTransform(Pos3D pos, float rotationY) {
   prefs.begin("config", false);
 
   prefs.putFloat("posX", pos.x);
   prefs.putFloat("posY", pos.y);
   prefs.putFloat("posZ", pos.z);
+  prefs.putFloat("rotationY", rotationY);
 
   prefs.end();
 
   devicePos = pos;
+  deviceRotationY = rotationY;
 }
 
 uint8_t activeStripCount()
@@ -296,6 +300,9 @@ void setup() {
   logPrint(devicePos.y);
   logPrint(", ");
   logPrintln(devicePos.z);
+  logPrint("Device Y rotation: ");
+  logPrint(deviceRotationY);
+  logPrintln(" degrees");
 
 
   for (int i=0; i<NUM_STRIPS; i++) {
