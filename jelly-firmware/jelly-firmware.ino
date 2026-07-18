@@ -193,6 +193,8 @@ void loadDeviceConfig() {
 }
 
 void saveDeviceConfig(bool newHasScale, bool newIsJelly, bool newIsBig) {
+  const bool sizeChanged = (isBig != newIsBig);
+
   prefs.begin("config", false);
   prefs.putBool("hasScale", newHasScale);
   prefs.putBool("isJelly", newIsJelly);
@@ -202,6 +204,10 @@ void saveDeviceConfig(bool newHasScale, bool newIsJelly, bool newIsBig) {
   hasScale = newHasScale;
   isJelly = newIsJelly;
   isBig = newIsBig;
+
+  if (sizeChanged) {
+    calculateLedPositions();
+  }
 }
 
 void savePattern(const String& p) {
@@ -232,16 +238,14 @@ uint8_t activeStripCount()
 
 void setupStrips()
 {
-    const uint8_t count = activeStripCount();
-
-    for (uint8_t s = 0; s < count; s++) {
+    // Initialize all twelve bus objects on every device. Small jellyfish only
+    // display the first eight, but this keeps runtime size changes safe.
+    for (uint8_t s = 0; s < NUM_STRIPS; s++) {
         strips[s].Begin();
         strips[s].ClearTo(RgbColor(0));
     }
 
-    // Calling Show() on every initialized member completes
-    // the parallel-group update.
-    for (uint8_t s = 0; s < count; s++) {
+    for (uint8_t s = 0; s < NUM_STRIPS; s++) {
         strips[s].Show();
     }
 }
@@ -305,10 +309,7 @@ void setup() {
   logPrintln(" degrees");
 
 
-  for (int i=0; i<NUM_STRIPS; i++) {
-    strips[i].Begin();
-    strips[i].Show();
-  } 
+  setupStrips();
 
   connectToAnyWiFi();
   lastWiFiAttempt = millis();
@@ -338,11 +339,7 @@ void setup() {
   }
 
   logPrintln("Calculating LED positions");
-  for (int s = 0; s < 8; s++) {
-    for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
-        ledPos[s][p] = smallJellyFind3Dpos(p, s);
-    }
-  }
+  calculateLedPositions();
 
   setupMusicUdp();
   setupScaleUdp();

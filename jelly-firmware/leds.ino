@@ -111,17 +111,25 @@ void drawFrame() {
 
 // Flashing identify routine, called directly from firmware on request
 void runIdentifySequence() {
-  for (int times=0; times<3; times++) {
-    for (int i=0; i< NUM_STRIPS; i++) {
-      fillStrip(strips[i], RgbColor(MAX_BRIGHTNESS,MAX_BRIGHTNESS,MAX_BRIGHTNESS));
-      strips[i].Show();
-    };
-    delay(400); 
-    for (int i=0; i< NUM_STRIPS; i++) {
-      fillStrip(strips[i], RgbColor(0,0,0));
-      strips[i].Show();
-    };
-    delay(400); 
+  const uint8_t count = activeStripCount();
+
+  for (int times = 0; times < 3; times++) {
+    for (uint8_t s = 0; s < count; s++) {
+      const uint16_t pixelCount =
+        (s < NUM_SHORT_STRIPS) ? NUM_LEDS_PER_STRIP : NUM_LEDS_PER_LONG_STRIP;
+      fillStrip(strips[s], pixelCount,
+                RgbColor(MAX_BRIGHTNESS, MAX_BRIGHTNESS, MAX_BRIGHTNESS));
+      strips[s].Show();
+    }
+    delay(400);
+
+    for (uint8_t s = 0; s < count; s++) {
+      const uint16_t pixelCount =
+        (s < NUM_SHORT_STRIPS) ? NUM_LEDS_PER_STRIP : NUM_LEDS_PER_LONG_STRIP;
+      fillStrip(strips[s], pixelCount, RgbColor(0, 0, 0));
+      strips[s].Show();
+    }
+    delay(400);
   }
 }
 
@@ -223,41 +231,90 @@ void updateLocalScaleState() {
   localCalmness = constrain(1.0f - localAgitation, 0.0f, 1.0f);
 }
 
-//Get position in the plane along one strip of a small jellyfish
-struct Pos2D smallJellyFind2Dpos(int p) {
-  struct Pos2D pos;
-  if (p<17) {
-    pos.y = -0.1*p;
-    pos.x = 0;
-  } else if (p<35) {
-    pos.y = (p-35)*0.1;
-    pos.x = 0.15;
-  } else if (p<40) {
-    pos.y = 0;
-    pos.x = (p-33)*0.1;
+Pos2D find2Dpos(uint16_t p) {
+  return isBig ? bigJellyFind2Dpos(p) : smallJellyFind2Dpos(p);
+}
+
+// Position in the vertical plane along one of the eight radial strips.
+Pos2D smallJellyFind2Dpos(uint16_t p) {
+  Pos2D pos;
+
+  if (p < 17) {
+    pos.y = -0.1f * p;
+    pos.x = 0.0f;
+  } else if (p < 35) {
+    pos.y = 0.1f * (p - 35);
+    pos.x = 0.15f;
+  } else if (p < 40) {
+    pos.y = 0.0f;
+    pos.x = 0.1f * (p - 33);
   } else {
-    pos.y = (40-p)*0.1;
-    pos.x = 0.6;
+    pos.y = 0.1f * (40 - p);
+    pos.x = 0.6f;
   }
+
   return pos;
 }
 
-//Get full 3D positions along all 8 stips
-struct Pos3D smallJellyFind3Dpos(int p, int s) {
-  struct Pos3D pos;
-  struct Pos2D pos2D = smallJellyFind2Dpos(p);
+Pos2D bigJellyFind2Dpos(uint16_t p) {
+  Pos2D pos;
 
+  if (p < 25) {
+    pos.y = 0.0f;
+    pos.x = 0.1f * p;
+  } else {
+    pos.y = -0.1f * (p - 25);
+    pos.x = 2.5f;
+  }
+
+  return pos;
+}
+
+// Rotate one of the first eight strips around the jellyfish's Y axis.
+Pos3D find3Dpos(uint16_t p, uint8_t stripIndex) {
+  const Pos2D pos2D = find2Dpos(p);
+  const float angle = TWO_PI * stripIndex / NUM_SHORT_STRIPS;
+
+  Pos3D pos;
+  pos.x = cosf(angle) * pos2D.x;
   pos.y = pos2D.y;
-  pos.x = cos(PI*s/4.0)*pos2D.x;
-  pos.z = sin(PI*s/4.0)*pos2D.x;
-
+  pos.z = sinf(angle) * pos2D.x;
   return pos;
 }
 
-// Full color on one strip
-void fillStrip(StripBus& strip, RgbColor c) {
-  for (uint16_t i = 0; i < NUM_LEDS_PER_STRIP; i++) {
+// The four extra strips on a big jellyfish hang straight down its centre.
+Pos3D findLongStrip3Dpos(uint16_t p) {
+  Pos3D pos;
+  pos.x = 0.0f;
+  pos.y = -0.1f * p;
+  pos.z = 0.0f;
+  return pos;
+}
+
+void calculateLedPositions() {
+  for (uint8_t s = 0; s < NUM_SHORT_STRIPS; s++) {
+    for (uint16_t p = 0; p < NUM_LEDS_PER_STRIP; p++) {
+      ledPos[s][p] = find3Dpos(p, s);
+    }
+  }
+
+  // Initialize these even on a small jellyfish. They are unused there, but this
+  // keeps the arrays valid if the configuration is inspected or changed later.
+  for (uint8_t s = 0; s < NUM_LONG_STRIPS; s++) {
+    for (uint16_t p = 0; p < NUM_LEDS_PER_LONG_STRIP; p++) {
+      ledPosLong[s][p] = findLongStrip3Dpos(p);
+    }
+  }
+}
+
+// Fill an explicitly sized strip.
+void fillStrip(StripBus& strip, uint16_t pixelCount, RgbColor c) {
+  for (uint16_t i = 0; i < pixelCount; i++) {
     strip.SetPixelColor(i, c);
   }
 }
 
+// Convenience overload for the normal 50-pixel radial strips.
+void fillStrip(StripBus& strip, RgbColor c) {
+  fillStrip(strip, NUM_LEDS_PER_STRIP, c);
+}
