@@ -17,8 +17,8 @@ const float        UPDATE_INTERVAL_MS  = 10;    // ms between LED frames
 
 constexpr uint8_t PINS[NUM_STRIPS] = {
     4, 5, 6, 7,
-    9, 10, 11, 12,
-    15, 16, 17, 18
+    9, 10, 11, 12
+    //,15, 16, 17, 18
 };
 
 // ── Ported-animation segment layout (fireSpread / waterfall / twoToneDiffuse) ──

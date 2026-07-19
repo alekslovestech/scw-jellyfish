@@ -17,7 +17,7 @@ struct InnerSpreadSegment {
 //   0..99    inner folded path
 //   100..124 bell/radial section
 //   125..149 outer hanging section
-static InnerSpreadSegment innerSpreadSegmentForPixel(int p) {
+static struct InnerSpreadSegment innerSpreadSegmentForPixel(int p) {
   InnerSpreadSegment result;
 
   if (isBig) {
