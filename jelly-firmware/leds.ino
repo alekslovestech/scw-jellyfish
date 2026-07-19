@@ -59,6 +59,7 @@ void ledsTick() {
 }
 
 void drawFrame() {
+  // First render the normal selected pattern.
   if (isJelly) {
     if (currentPattern == "demo") {
       demo();
@@ -101,6 +102,12 @@ void drawFrame() {
   } else {
     showColorWheelAcrossEightStrips();
   }
+
+  // Then add all active installation-wide ripples on top of that frame.
+  if (isJelly) {
+    overlayGlobalRipples();
+  }
+
   showLEDs();
   if (hasScale && scale.is_ready()) {
     _weight = scale.get_units(1);  

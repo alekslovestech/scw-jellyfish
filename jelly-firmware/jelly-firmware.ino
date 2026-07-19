@@ -78,6 +78,22 @@ struct Pos3D {
 struct Pos3D devicePos = {0.0f, 0.0f, 0.0f};
 float deviceRotationY = 0.0f;  // Degrees around the global Y axis
 
+// Global ripple overlay pool. These waves are rendered after the selected
+// pattern, so they add light without replacing the underlying animation.
+constexpr uint8_t MAX_GLOBAL_RIPPLES = 8;
+
+struct GlobalRipple {
+  bool active;
+  uint32_t eventId;
+  Pos3D origin;
+  RgbColor color;
+  unsigned long startMs;
+  unsigned long durationMs;
+  float speed;
+};
+
+GlobalRipple globalRipples[MAX_GLOBAL_RIPPLES] = {};
+
 // Both jelly sizes have eight rotationally symmetric strips.
 // Small units use the first 50 pixels; big units use all 150 pixels.
 constexpr uint16_t SMALL_JELLY_LEDS_PER_STRIP = 50;
@@ -341,6 +357,7 @@ void setup() {
 
   setupMusicUdp();
   setupScaleUdp();
+  setupGlobalRippleUdp();
 
 }
 
@@ -351,6 +368,7 @@ void loop() {
 
   ensureWiFi();
   handleMusicUdp();
+  handleGlobalRippleUdp();
 
   updateLocalScaleState();
   broadcastScaleState();

@@ -7,8 +7,8 @@
 
 // ── LED layout ──────────────────────────────────────────────────
 constexpr uint16_t NUM_SHORT_STRIPS = 8;
-constexpr uint16_t NUM_LONG_STRIPS  = 4;
-constexpr uint16_t NUM_STRIPS       = NUM_SHORT_STRIPS + NUM_LONG_STRIPS;
+constexpr uint16_t NUM_LONG_STRIPS  = 0;
+constexpr uint16_t NUM_STRIPS = NUM_SHORT_STRIPS + NUM_LONG_STRIPS;
 
 constexpr uint16_t NUM_LEDS_PER_STRIP      = 50;
 constexpr uint16_t NUM_LEDS_PER_LONG_STRIP = 100;

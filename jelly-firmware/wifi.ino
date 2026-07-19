@@ -5,6 +5,9 @@
 
 WiFiUDP udp;
 WiFiUDP scaleUdp;
+WiFiUDP globalRippleUdp;
+
+constexpr uint16_t GLOBAL_RIPPLE_UDP_PORT = 4212;
 
 String lastSendStatus = "Ready";
 bool hasReceivedNumber = false;
@@ -214,6 +217,83 @@ void handleScaleUdp() {
   scalePeers[idx].calmness = constrain(calmness, 0.0f, 1.0f);
 
   scalePeers[idx].lastSeenMs = millis();
+}
+
+
+// ── Global ripple UDP --------------------------------------------------------
+
+void setupGlobalRippleUdp() {
+  globalRippleUdp.begin(GLOBAL_RIPPLE_UDP_PORT);
+  logPrintf("Global ripple UDP listening on port %u\n", GLOBAL_RIPPLE_UDP_PORT);
+}
+
+void handleGlobalRippleUdp() {
+  int packetSize = globalRippleUdp.parsePacket();
+  if (!packetSize) return;
+
+  char packet[160];
+  int len = globalRippleUdp.read(packet, sizeof(packet) - 1);
+  if (len <= 0) return;
+  packet[len] = '\0';
+
+  char kind[20];
+  unsigned long eventId;
+  float x, y, z, speed;
+  int red, green, blue;
+  unsigned long durationMs;
+
+  // globalRipple,eventId,x,y,z,r,g,b,speed,durationMs
+  int matched = sscanf(
+    packet,
+    "%19[^,],%lu,%f,%f,%f,%d,%d,%d,%f,%lu",
+    kind, &eventId, &x, &y, &z, &red, &green, &blue, &speed, &durationMs
+  );
+
+  if (matched != 10 || String(kind) != "globalRipple") return;
+
+  Pos3D origin = {x, y, z};
+  RgbColor color(
+    constrain(red, 0, 255),
+    constrain(green, 0, 255),
+    constrain(blue, 0, 255)
+  );
+  startGlobalRipple((uint32_t)eventId, origin, color, speed, durationMs);
+}
+
+void broadcastGlobalRipple(const Pos3D& origin,
+                           RgbColor color,
+                           float speed,
+                           unsigned long durationMs) {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  uint32_t eventId = esp_random();
+  if (eventId == 0) eventId = 1;
+
+  String packet;
+  packet.reserve(150);
+  packet += "globalRipple,";
+  packet += String(eventId) + ",";
+  packet += String(origin.x, 3) + ",";
+  packet += String(origin.y, 3) + ",";
+  packet += String(origin.z, 3) + ",";
+  packet += String(color.R) + ",";
+  packet += String(color.G) + ",";
+  packet += String(color.B) + ",";
+  packet += String(speed, 3) + ",";
+  packet += String(durationMs);
+
+  IPAddress broadcastIp(255, 255, 255, 255);
+
+  // Repeat packets reduce the chance of a single lost UDP datagram. Starting
+  // locally after transmission also keeps the sender aligned with receivers.
+  for (uint8_t attempt = 0; attempt < 3; attempt++) {
+    globalRippleUdp.beginPacket(broadcastIp, GLOBAL_RIPPLE_UDP_PORT);
+    globalRippleUdp.write((const uint8_t*)packet.c_str(), packet.length());
+    globalRippleUdp.endPacket();
+    delay(4);
+  }
+
+  startGlobalRipple(eventId, origin, color, speed, durationMs);
 }
 
 // ── Web server + OTA 
@@ -550,6 +630,47 @@ void handlePattern() {
     String("{\"ok\":true,\"pattern\":\"") + currentPattern + "\"}");
 }
 
+void handleGlobalRipple() {
+  Pos3D origin = {0.0f, 0.0f, 0.0f};
+  int red = 0;
+  int green = 0;
+  int blue = 255;
+  float speed = 1.0f;
+  unsigned long durationMs = 30000;
+
+  if (server.hasArg("posX")) origin.x = server.arg("posX").toFloat();
+  if (server.hasArg("posY")) origin.y = server.arg("posY").toFloat();
+  if (server.hasArg("posZ")) origin.z = server.arg("posZ").toFloat();
+  if (server.hasArg("r")) red = server.arg("r").toInt();
+  if (server.hasArg("g")) green = server.arg("g").toInt();
+  if (server.hasArg("b")) blue = server.arg("b").toInt();
+  if (server.hasArg("speed")) speed = server.arg("speed").toFloat();
+  if (server.hasArg("durationMs")) {
+    durationMs = (unsigned long)server.arg("durationMs").toInt();
+  }
+
+  speed = constrain(speed, 0.05f, 20.0f);
+  durationMs = constrain(durationMs, 1000UL, 120000UL);
+  RgbColor color(
+    constrain(red, 0, 255),
+    constrain(green, 0, 255),
+    constrain(blue, 0, 255)
+  );
+
+  broadcastGlobalRipple(origin, color, speed, durationMs);
+
+  server.send(200, "application/json",
+    String("{\"ok\":true,\"posX\":") + String(origin.x, 3) +
+    ",\"posY\":" + String(origin.y, 3) +
+    ",\"posZ\":" + String(origin.z, 3) +
+    ",\"r\":" + String(color.R) +
+    ",\"g\":" + String(color.G) +
+    ",\"b\":" + String(color.B) +
+    ",\"speed\":" + String(speed, 3) +
+    ",\"durationMs\":" + String(durationMs) + "}"
+  );
+}
+
 void handlePosition() {
   struct Pos3D newPos = devicePos;
   float newRotationY = deviceRotationY;
@@ -632,6 +753,7 @@ void setupWebServer() {
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/config", HTTP_POST, handleConfig);
   server.on("/pattern", HTTP_POST, handlePattern);
+  server.on("/global-ripple", HTTP_POST, handleGlobalRipple);
   server.on("/position", HTTP_POST, handlePosition);
   server.on("/device-id", HTTP_POST, handleDeviceId);
 

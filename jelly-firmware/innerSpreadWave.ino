@@ -1,46 +1,120 @@
 #include "config.h"
 #include "color_utils.h"
 
+struct InnerSpreadSegment {
+  int group;
+  float t;
+};
+
+// Returns the logical segment and normalized progress within that segment.
+//
+// Small layout:
+//   0..34  inner folded path
+//   35..39 bell/radial section
+//   40..49 outer hanging section
+//
+// Big layout:
+//   0..99    inner folded path
+//   100..124 bell/radial section
+//   125..149 outer hanging section
+static InnerSpreadSegment innerSpreadSegmentForPixel(int p) {
+  InnerSpreadSegment result;
+
+  if (isBig) {
+    if (p < 100) {
+      result.group = FS_SEG_INNER;
+      result.t = p / 99.0f;
+    } else if (p < 125) {
+      result.group = FS_SEG_BELL;
+      result.t = (p - 100) / 24.0f;
+    } else {
+      result.group = FS_SEG_OUTER;
+      result.t = (p - 125) / 24.0f;
+    }
+  } else {
+    if (p < 35) {
+      result.group = FS_SEG_INNER;
+      result.t = p / 34.0f;
+    } else if (p < 40) {
+      result.group = FS_SEG_BELL;
+      result.t = (p - 35) / 4.0f;
+    } else {
+      result.group = FS_SEG_OUTER;
+      result.t = (p - 40) / 9.0f;
+    }
+  }
+
+  result.t = fsClamp01(result.t);
+  return result;
+}
+
 // innerSpreadWave — ported from visualizer-ts/src/animations/innerSpreadWave.ts.
 //
-// A traveling sinusoidal "worm" runs along the inner -> bell -> outer path. Inner
-// tentacles show a red worm on black; bell/outer sit blue and flash red as the
-// crest passes. The inner path position uses PHYSICAL HEIGHT so the folded inner
-// tentacle doesn't scramble the wave (bell/outer don't fold, so they use t).
+// A traveling sinusoidal worm runs along the inner -> bell -> outer path.
+// The folded inner section uses physical height so both sides of the fold
+// illuminate together rather than following raw pixel order.
 void innerSpreadWave() {
-  const float WORM_FREQ   = 17.0f;  // spatial frequency along the full path
-  const float SPEED       = 1.2f;   // wave travel speed (was 5 in TS; slowed down)
-  const float JELLY_PHASE = 0.8f;   // phase offset per jelly so a fleet ripples
-  const float MAX_DEPTH   = 1.8f;   // top (y=0) to lowest inner tip (~ -1.8)
+  constexpr float WORM_FREQ   = 17.0f;
+  constexpr float SPEED       = 1.2f;
+  constexpr float JELLY_PHASE = 0.8f;
 
-  float time = millis() / 1000.0f;
-  float jellyOffset = _jellyId * JELLY_PHASE;
+  // Small inner tentacle reaches approximately y = -1.8.
+  // Big inner tentacle reaches approximately y = -4.9.
+  const float maxInnerDepth = isBig ? 4.9f : 1.8f;
+  const int pixelsPerStrip = activeLedCountPerStrip();
 
-  for (int s = 0; s < 8; s++) {
-    for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {
-      int group; float t;
-      fsSegmentForPos(p, &group, &t);
+  const float time = millis() * 0.001f;
+  const float jellyOffset = _jellyId * JELLY_PHASE;
 
-      // Continuous 0->1 position: inner tip(0) -> inner root(0.6) -> bell rim(0.8) -> outer tip(1).
-      float pos;
-      if (group == FS_SEG_INNER) {
-        float depth = fsClamp01(-ledPos[s][p].y / MAX_DEPTH); // 0 root(top) .. 1 tip(bottom)
-        pos = (1.0f - depth) * 0.6f;                          // tip -> 0, root -> 0.6
-      } else if (group == FS_SEG_BELL) {
-        pos = 0.6f + t * 0.2f;
-      } else { // outer
-        pos = 0.8f + t * 0.2f;
+  for (int s = 0; s < NUM_SHORT_STRIPS; s++) {
+    for (int p = 0; p < pixelsPerStrip; p++) {
+      const InnerSpreadSegment segment =
+        innerSpreadSegmentForPixel(p);
+
+      float pathPosition;
+
+      if (segment.group == FS_SEG_INNER) {
+        // Physical height:
+        //   root/top -> depth 0
+        //   lowest point -> depth 1
+        //
+        // Convert that to path position:
+        //   inner tip -> 0.0
+        //   inner root -> 0.6
+        const float depth = fsClamp01(
+          -ledPos[s][p].y / maxInnerDepth
+        );
+
+        pathPosition = (1.0f - depth) * 0.6f;
+      }
+      else if (segment.group == FS_SEG_BELL) {
+        pathPosition = 0.6f + segment.t * 0.2f;
+      }
+      else {
+        pathPosition = 0.8f + segment.t * 0.2f;
       }
 
-      float wave = sinf(pos * WORM_FREQ - time * SPEED + jellyOffset);
-      if (wave < 0.0f) wave = 0.0f;
+      float wave = sinf(
+        pathPosition * WORM_FREQ
+        - time * SPEED
+        + jellyOffset
+      );
 
-      if (group == FS_SEG_INNER) {
-        // Red worm on inner; dark between pulses (R = wave^2, matching the TS look).
-        strips[s].SetPixelColor(p, rgbWithIntensity(wave, 0, 0, wave));
-      } else {
-        // Bell/outer: blue at rest, red as the crest passes through.
-        strips[s].SetPixelColor(p, rgbWithIntensity(wave, 0, 1.0f - wave));
+      wave = fmaxf(wave, 0.0f);
+
+      if (segment.group == FS_SEG_INNER) {
+        // Squared red intensity gives the worm a narrower, sharper crest.
+        strips[s].SetPixelColor(
+          p,
+          rgbWithIntensity(wave, 0.0f, 0.0f, wave)
+        );
+      }
+      else {
+        // Bell and outer tentacle remain blue between passing crests.
+        strips[s].SetPixelColor(
+          p,
+          rgbWithIntensity(wave, 0.0f, 1.0f - wave)
+        );
       }
     }
   }
