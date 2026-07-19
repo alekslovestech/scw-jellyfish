@@ -78,24 +78,25 @@ struct Pos3D {
 struct Pos3D devicePos = {0.0f, 0.0f, 0.0f};
 float deviceRotationY = 0.0f;  // Degrees around the global Y axis
 
-//positions of (num of strips * number of leds)
-struct Pos3D ledPos[NUM_SHORT_STRIPS][NUM_LEDS_PER_STRIP];
-struct Pos3D ledPosLong[NUM_LONG_STRIPS][NUM_LEDS_PER_LONG_STRIP];
+// Both jelly sizes have eight rotationally symmetric strips.
+// Small units use the first 50 pixels; big units use all 150 pixels.
+constexpr uint16_t SMALL_JELLY_LEDS_PER_STRIP = 50;
+constexpr uint16_t BIG_JELLY_LEDS_PER_STRIP   = 150;
+constexpr uint16_t MAX_JELLY_LEDS_PER_STRIP   = BIG_JELLY_LEDS_PER_STRIP;
 
-StripBus strips[NUM_STRIPS] = {
-    {NUM_LEDS_PER_STRIP,      PINS[0]},
-    {NUM_LEDS_PER_STRIP,      PINS[1]},
-    {NUM_LEDS_PER_STRIP,      PINS[2]},
-    {NUM_LEDS_PER_STRIP,      PINS[3]},
-    {NUM_LEDS_PER_STRIP,      PINS[4]},
-    {NUM_LEDS_PER_STRIP,      PINS[5]},
-    {NUM_LEDS_PER_STRIP,      PINS[6]},
-    {NUM_LEDS_PER_STRIP,      PINS[7]},
+Pos3D ledPos[NUM_SHORT_STRIPS][MAX_JELLY_LEDS_PER_STRIP];
 
-    {NUM_LEDS_PER_LONG_STRIP, PINS[8]},
-    {NUM_LEDS_PER_LONG_STRIP, PINS[9]},
-    {NUM_LEDS_PER_LONG_STRIP, PINS[10]},
-    {NUM_LEDS_PER_LONG_STRIP, PINS[11]}
+// NeoPixelBus length is fixed when the object is constructed, so every device
+// allocates the 150-pixel maximum. Small jellyfish simply use the first 50.
+StripBus strips[NUM_SHORT_STRIPS] = {
+    {MAX_JELLY_LEDS_PER_STRIP, PINS[0]},
+    {MAX_JELLY_LEDS_PER_STRIP, PINS[1]},
+    {MAX_JELLY_LEDS_PER_STRIP, PINS[2]},
+    {MAX_JELLY_LEDS_PER_STRIP, PINS[3]},
+    {MAX_JELLY_LEDS_PER_STRIP, PINS[4]},
+    {MAX_JELLY_LEDS_PER_STRIP, PINS[5]},
+    {MAX_JELLY_LEDS_PER_STRIP, PINS[6]},
+    {MAX_JELLY_LEDS_PER_STRIP, PINS[7]}
 };
 
 WebServer server(80);
@@ -231,23 +232,20 @@ void saveDeviceTransform(Pos3D pos, float rotationY) {
   deviceRotationY = rotationY;
 }
 
-uint8_t activeStripCount()
-{
-    return isBig ? NUM_STRIPS : NUM_SHORT_STRIPS;
+uint8_t activeStripCount() {
+  return NUM_SHORT_STRIPS;
 }
 
-void setupStrips()
-{
-    // Initialize all twelve bus objects on every device. Small jellyfish only
-    // display the first eight, but this keeps runtime size changes safe.
-    for (uint8_t s = 0; s < NUM_STRIPS; s++) {
-        strips[s].Begin();
-        strips[s].ClearTo(RgbColor(0));
-    }
+uint16_t activeLedCountPerStrip() {
+  return isBig ? BIG_JELLY_LEDS_PER_STRIP : SMALL_JELLY_LEDS_PER_STRIP;
+}
 
-    for (uint8_t s = 0; s < NUM_STRIPS; s++) {
-        strips[s].Show();
-    }
+void setupStrips() {
+  for (uint8_t s = 0; s < NUM_SHORT_STRIPS; s++) {
+    strips[s].Begin();
+    strips[s].ClearTo(RgbColor(0));
+    strips[s].Show();
+  }
 }
 
 bool initScaleWithTimeout(unsigned long timeoutMs) {

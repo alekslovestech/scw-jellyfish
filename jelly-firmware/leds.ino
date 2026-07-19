@@ -115,8 +115,7 @@ void runIdentifySequence() {
 
   for (int times = 0; times < 3; times++) {
     for (uint8_t s = 0; s < count; s++) {
-      const uint16_t pixelCount =
-        (s < NUM_SHORT_STRIPS) ? NUM_LEDS_PER_STRIP : NUM_LEDS_PER_LONG_STRIP;
+      const uint16_t pixelCount = activeLedCountPerStrip();
       fillStrip(strips[s], pixelCount,
                 RgbColor(MAX_BRIGHTNESS, MAX_BRIGHTNESS, MAX_BRIGHTNESS));
       strips[s].Show();
@@ -124,8 +123,7 @@ void runIdentifySequence() {
     delay(400);
 
     for (uint8_t s = 0; s < count; s++) {
-      const uint16_t pixelCount =
-        (s < NUM_SHORT_STRIPS) ? NUM_LEDS_PER_STRIP : NUM_LEDS_PER_LONG_STRIP;
+      const uint16_t pixelCount = activeLedCountPerStrip();
       fillStrip(strips[s], pixelCount, RgbColor(0, 0, 0));
       strips[s].Show();
     }
@@ -153,13 +151,8 @@ void showLEDs()
     }
 }
 
-const Pos3D& getLedPosition(uint8_t stripIndex, uint16_t pixelIndex)
-{
-    if (stripIndex < NUM_SHORT_STRIPS) {
-        return ledPos[stripIndex][pixelIndex];
-    }
-
-    return ledPosLong[stripIndex - NUM_SHORT_STRIPS][pixelIndex];
+const Pos3D& getLedPosition(uint8_t stripIndex, uint16_t pixelIndex) {
+  return ledPos[stripIndex][pixelIndex];
 }
 
 // Return this LED's position in the shared/global coordinate system.
@@ -259,12 +252,22 @@ Pos2D smallJellyFind2Dpos(uint16_t p) {
 Pos2D bigJellyFind2Dpos(uint16_t p) {
   Pos2D pos;
 
-  if (p < 25) {
+  if (p < 50) {
+    // First 50 LEDs: straight down the centre.
+    pos.x = 0.0f;
+    pos.y = -0.1f * p;
+  } else if (p < 100) {
+    // Next 50: back up, slightly farther from the centre.
+    pos.x = 0.15f;
+    pos.y = 0.1f * (p - 100);
+  } else if (p < 125) {
+    // Next 25: radially outward across the bell.
+    pos.x = 0.15f + 0.1f * (p - 100);
     pos.y = 0.0f;
-    pos.x = 0.1f * p;
   } else {
-    pos.y = -0.1f * (p - 25);
-    pos.x = 2.5f;
+    // Final 25: down from the outer edge.
+    pos.x = 2.55f;
+    pos.y = -0.1f * (p - 125);
   }
 
   return pos;
@@ -282,27 +285,12 @@ Pos3D find3Dpos(uint16_t p, uint8_t stripIndex) {
   return pos;
 }
 
-// The four extra strips on a big jellyfish hang straight down its centre.
-Pos3D findLongStrip3Dpos(uint16_t p) {
-  Pos3D pos;
-  pos.x = 0.0f;
-  pos.y = -0.1f * p;
-  pos.z = 0.0f;
-  return pos;
-}
-
 void calculateLedPositions() {
-  for (uint8_t s = 0; s < NUM_SHORT_STRIPS; s++) {
-    for (uint16_t p = 0; p < NUM_LEDS_PER_STRIP; p++) {
-      ledPos[s][p] = find3Dpos(p, s);
-    }
-  }
+  const uint16_t pixelCount = activeLedCountPerStrip();
 
-  // Initialize these even on a small jellyfish. They are unused there, but this
-  // keeps the arrays valid if the configuration is inspected or changed later.
-  for (uint8_t s = 0; s < NUM_LONG_STRIPS; s++) {
-    for (uint16_t p = 0; p < NUM_LEDS_PER_LONG_STRIP; p++) {
-      ledPosLong[s][p] = findLongStrip3Dpos(p);
+  for (uint8_t strip = 0; strip < NUM_SHORT_STRIPS; strip++) {
+    for (uint16_t pixel = 0; pixel < pixelCount; pixel++) {
+      ledPos[strip][pixel] = find3Dpos(pixel, strip);
     }
   }
 }
@@ -314,7 +302,7 @@ void fillStrip(StripBus& strip, uint16_t pixelCount, RgbColor c) {
   }
 }
 
-// Convenience overload for the normal 50-pixel radial strips.
+// Convenience overload for the currently configured jelly size.
 void fillStrip(StripBus& strip, RgbColor c) {
-  fillStrip(strip, NUM_LEDS_PER_STRIP, c);
+  fillStrip(strip, activeLedCountPerStrip(), c);
 }
