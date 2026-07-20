@@ -18,7 +18,7 @@ float ripple(float x) {
 
 // Expanding wavefront radiating outward from a 3-D point.
 void rippleOutFromPoint(const Pos3D& startPoint, int frame, RgbColor rgb) {
-  const float wavePosition = frame * 0.01f;
+  const float wavePosition = frame * 0.0531f;
 
   for (int s = 0; s < 8; s++) {
     for (int p = 0; p < NUM_LEDS_PER_STRIP; p++) {

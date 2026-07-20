@@ -58,6 +58,20 @@ struct ScalePeer {
 
 ScalePeer scalePeers[MAX_SCALE_PEERS];
 
+enum GlowPhase : uint8_t {
+  GLOW_INACTIVE,
+  GLOW_RISING,
+  GLOW_FADING
+};
+
+struct PixelGlow {
+  uint8_t hue;
+  float brightness;
+  GlowPhase phase;
+};
+
+PixelGlow pixelGlows[NUM_SHORT_STRIPS][NUM_LEDS_PER_STRIP] = {};
+
 // Defined here (concatenated first) so fireSpread.ino sees them — variables, unlike
 // functions, are not auto-prototyped across the sketch's alphabetical tab order.
 int   _ledFrame = 0;          // shared animation frame counter

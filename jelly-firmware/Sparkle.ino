@@ -3,7 +3,6 @@ static float spark[NUM_STRIPS][NUM_LEDS_PER_STRIP];
 
 void sparkle()
 {
-    // Equivalent to: if random.random() < 0.2
     if (random(1000) < 200) {
       uint8_t s = random(NUM_STRIPS);
       uint16_t p = random(NUM_LEDS_PER_STRIP);

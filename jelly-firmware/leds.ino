@@ -22,6 +22,11 @@ float distanceFast(const Pos3D& pos1, const Pos3D& pos2) {
   return sqrtf(distanceSQ);
 }
 
+void overlayRandomPixelGlows(float newStartsPerSecond,
+                             float risePerSecond,
+                             float fadePerSecond,
+                             float peakBrightness = 255.0f);
+
 // ── Shared helpers for the ported visualizer animations ─────────────────────
 // (fireSpread / waterfall / twoToneDiffuse). FS_* segment consts live in config.h;
 // _jellyId / _fireStartTime live in jelly-firmware.ino so they precede fireSpread.ino
@@ -107,6 +112,14 @@ void drawFrame() {
   if (isJelly) {
     overlayGlobalRipples();
   }
+
+/*  overlayRandomPixelGlows(
+      2.0f,    // average new starts per second
+      8.0f,   // rise brightness per second
+      3.0f,   // fade brightness per second
+      180.0f   // peak brightness
+  );*/
+
 
   showLEDs();
   if (hasScale && scale.is_ready()) {

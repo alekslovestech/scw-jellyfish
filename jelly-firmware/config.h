@@ -10,8 +10,8 @@ constexpr uint16_t NUM_SHORT_STRIPS = 8;
 constexpr uint16_t NUM_LONG_STRIPS  = 0;
 constexpr uint16_t NUM_STRIPS = NUM_SHORT_STRIPS + NUM_LONG_STRIPS;
 
-constexpr uint16_t NUM_LEDS_PER_STRIP      = 50;
-constexpr uint16_t NUM_LEDS_PER_LONG_STRIP = 100;
+constexpr uint16_t NUM_LEDS_PER_STRIP      = 150;
+//constexpr uint16_t NUM_LEDS_PER_LONG_STRIP = 100;
 const uint8_t      MAX_BRIGHTNESS      = 128;   // 0-255, global LED brightness cap
 const float        UPDATE_INTERVAL_MS  = 10;    // ms between LED frames
 
