@@ -22,7 +22,7 @@
   <div class="grid">
     <section class="panel">
       <div class="section-title"><h2>Spatial field</h2><span id="clockBadge" class="badge">Shared clock</span></div>
-      <canvas id="map" width="1000" height="650"></canvas>
+      <canvas id="map" width="500" height="500"></canvas>
       <div class="legend"><span><i class="jelly"></i>Jellyfish</span><span><i class="platform"></i>Meditation platform</span><span>Halo = influence / agitation</span></div>
     </section>
 
@@ -77,7 +77,7 @@
 </main>
 
 <dialog id="deviceDialog">
-  <div class="dialog-head"><div><div class="eyebrow">Controller</div><strong id="dialogTitle">Device</strong></div><button class="close" onclick="deviceDialog.close()">×</button></div>
+  <div class="dialog-head"><div><div class="eyebrow">Controller</div><strong id="dialogTitle">Device</strong></div><div class="button-row" style="margin:0"><button id="dialogSaveAll" class="primary">Save all</button><button class="close" onclick="deviceDialog.close()">×</button></div></div>
   <div id="dialogBody" class="dialog-body"></div>
 </dialog>
 <div id="toast" class="toast"></div>

@@ -46,7 +46,7 @@ function renderMap(){
   ctx.save();ctx.strokeStyle='#4d99b1';ctx.fillStyle='#a8cbdc';ctx.lineWidth=2;ctx.font='bold 13px system-ui';ctx.textAlign='center';
   ctx.beginPath();ctx.moveTo(26,40);ctx.lineTo(26,14);ctx.moveTo(18,22);ctx.lineTo(26,14);ctx.lineTo(34,22);ctx.stroke();
   ctx.fillText('N',26,56);ctx.restore();
-  for(const p of state.platforms){const [x,y]=xy(p.x,p.z);const radius=(state.settings?.influenceRadiusMeters||5)/(maxX-minX)*w;const halo=ctx.createRadialGradient(x,y,4,x,y,Math.max(10,radius));halo.addColorStop(0,p.occupied?(p.agitation>.2?'#ff718477':'#ffe39a77'):'#ffe39a22');halo.addColorStop(1,'transparent');ctx.fillStyle=halo;ctx.beginPath();ctx.arc(x,y,Math.max(10,radius),0,Math.PI*2);ctx.fill();ctx.fillStyle=p.occupied?'#ffe39a':'#806f43';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.fill();ctx.fillStyle='#071017';ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillText(p.id,x,y+4);}
+  for(const p of state.platforms){const [x,y]=xy(p.x,p.z);const radius=(state.settings?.influenceRadiusMeters||5)/(maxX-minX)*w;const halo=ctx.createRadialGradient(x,y,4,x,y,Math.max(10,radius));halo.addColorStop(0,p.occupied?(p.agitation>.2?'#ff718477':'#ffe39a77'):'#ffe39a22');halo.addColorStop(1,'transparent');ctx.fillStyle=halo;ctx.beginPath();ctx.arc(x,y,Math.max(10,radius),0,Math.PI*2);ctx.fill();ctx.fillStyle=p.occupied?'#ffe39a':'#806f43';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.fill();ctx.fillStyle='#071017';ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillText(p.id,x,y+4);const device=state.devices.find(d=>d.hasScale&&Number(d.id)===Number(p.id));ctx.fillStyle='#e8d9ad';ctx.font='11px system-ui';ctx.textAlign='left';ctx.fillText(device?device.name:`Platform ${p.id}`,x+13,y+4);}
   for(const d of state.devices.filter(d=>d.isJelly)){const [x,y]=xy(d.posX,d.posZ);ctx.shadowColor='#62e4ff';ctx.shadowBlur=d.online?16:0;ctx.fillStyle=d.online?'#62e4ff':'#42606b';ctx.beginPath();ctx.arc(x,y,d.isBig?9:6,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#ccefff';ctx.font='11px system-ui';ctx.textAlign='left';ctx.fillText(d.name,x+12,y+4);}
 }
 function roles(d){const list=[];if(d.isJelly)list.push(d.isBig?'big jelly':'jelly');if(d.hasScale)list.push('platform');if(d.localShowOverride)list.push(`${d.localOverrideMode||'local'} override`);if(!list.length)list.push('controller');return list.map(x=>`<span class="role">${esc(x)}</span>`).join('');}
@@ -54,6 +54,9 @@ function renderDevices(){const grid=document.getElementById('deviceGrid');if(!st
 function renderEvents(){const box=document.getElementById('events');if(!state.events.length){box.innerHTML='<div class="small">No activation events yet.</div>';return;}box.innerHTML=state.events.slice(0,8).map(e=>`<div class="event"><b>Platform ${e.platformId||'test'}</b> at (${num(e.x,1)}, ${num(e.z,1)})<div class="small">${num(e.weightKg,1)} kg · gains ${(e.speakerGains||[]).map(v=>num(v,2)).join(' / ')}</div></div>`).join('');}
 function openDevice(key){state.selectedKey=key;state.dialogDirty=false;const d=state.devices.find(x=>x.key===key);renderDialog(d);deviceDialog.showModal();}
 function slider(name,label,value,max=1,step=.01){return `<label>${label}<input name="${name}" type="range" min="0" max="${max}" step="${step}" value="${esc(value)}"><span class="small" data-value-for="${name}">${num(value)}</span></label>`;}
+function hueToHex(hue){const h=((Number(hue)||0)%1+1)%1;const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};const r=hue2rgb(0,1,h+1/3),g=hue2rgb(0,1,h),b=hue2rgb(0,1,h-1/3);const toHex=v=>Math.round(v*255).toString(16).padStart(2,'0');return `#${toHex(r)}${toHex(g)}${toHex(b)}`;}
+function hexToHue(hex){const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;const max=Math.max(r,g,b),min=Math.min(r,g,b);if(max===min)return 0;const d=max-min;let h;if(max===r)h=(g-b)/d+(g<b?6:0);else if(max===g)h=(b-r)/d+2;else h=(r-g)/d+4;return h/6;}
+function colorPicker(name,label,hex){return `<label class="color-field"><input name="${name}" type="color" value="${hex}"><span>${label}</span></label>`;}
 function sensorTuningPanel(d){
   if(!d.hasScale)return '';
   const t={
@@ -77,7 +80,7 @@ function sensorTuningPanel(d){
         <label>Calm rise filter (s)<input name="calmRiseSeconds" type="number" min="0.1" step="0.1" value="${esc(t.calmRiseSeconds)}"></label>
         <label>Calm fall filter (s)<input name="calmFallSeconds" type="number" min="0.1" step="0.1" value="${esc(t.calmFallSeconds)}"></label>
       </div>
-      <div class="button-row"><button>Save and apply sensing</button><button type="button" data-action="tareSensor">Tare now</button></div>
+      <div class="button-row"><button type="button" data-action="tareSensor">Tare now</button></div>
       <div class="small" style="margin-top:8px">The separate occupied/empty thresholds prevent chatter. Calmness builds only while occupied and below the stillness threshold.</div>
     </form>
   </div>`;
@@ -86,6 +89,7 @@ function renderDialog(d){
   if(!d)return;
   document.getElementById('dialogTitle').textContent=d.name;
   const p={brightness:.72,speed:.45,scale:1,density:.45,hue:.52,hue2:.72,contrast:.65,sparkle:.1,...d.patternParameters};
+  const hueHex=hueToHex(p.hue),hue2Hex=hueToHex(p.hue2);
   const sensor=d.sensor||{},field=d.field||{};
   const polar=xzToPolar(Number(d.posX)||0,Number(d.posZ)||0);
   document.getElementById('dialogBody').innerHTML=`
@@ -109,7 +113,7 @@ function renderDialog(d){
           <label class="check"><input name="isBig" type="checkbox" ${d.isBig?'checked':''}>Big geometry</label>
           <label>Power limit (mA)<input name="powerLimitMilliAmps" type="number" min="500" max="60000" value="${d.powerLimitMilliAmps||12000}"></label>
         </div>
-        <div class="button-row"><button data-action="saveIdentity">Save identity</button><button data-action="saveConfig">Save role</button><button type="button" data-action="identify">Identify</button><button type="button" data-action="tare" ${d.hasScale?'':'disabled'}>Tare scale</button></div>
+        <div class="button-row"><button type="button" data-action="identify">Identify</button><button type="button" data-action="tare" ${d.hasScale?'':'disabled'}>Tare scale</button></div>
       </form>
     </div>
     <div class="subpanel"><h3>Position</h3>
@@ -121,7 +125,7 @@ function renderDialog(d){
       </div>
       <div class="small" style="margin-top:8px" data-derived-xz>Derived: X ${num(d.posX,3)} · Z ${num(d.posZ,3)}</div>
       <input type="hidden" name="posX" value="${d.posX}"><input type="hidden" name="posZ" value="${d.posZ}">
-      <div class="button-row"><button>Save transform</button></div></form>
+      </form>
     </div>
     ${sensorTuningPanel(d)}
     <div class="subpanel"><h3>Fallback pattern and parameters</h3>
@@ -130,8 +134,7 @@ function renderDialog(d){
           <label>Pattern<select name="pattern">${patternOptions(d.pattern)}</select></label>
           <label>Controller override<select name="mode"><option value="follow" ${!d.localShowOverride?'selected':''}>Follow global conductor</option><option value="auto" ${d.localShowOverride&&d.localOverrideMode==='auto'?'selected':''}>Local auto</option><option value="fallback" ${d.localShowOverride&&d.localOverrideMode==='fallback'?'selected':''}>Local fallback pattern</option><option value="forest" ${d.localShowOverride&&d.localOverrideMode==='forest'?'selected':''}>Local ambient forest</option><option value="chorus" ${d.localShowOverride&&d.localOverrideMode==='chorus'?'selected':''}>Local chorus</option><option value="blackout" ${d.localShowOverride&&d.localOverrideMode==='blackout'?'selected':''}>Local blackout</option></select></label>
         </div>
-        <div class="field-grid four" style="margin-top:14px">${slider('brightness','Brightness',p.brightness)}${slider('speed','Speed',p.speed)}${slider('scale','Scale',p.scale,2,.01)}${slider('density','Density',p.density)}${slider('hue','Primary hue',p.hue)}${slider('hue2','Secondary hue',p.hue2)}${slider('contrast','Contrast',p.contrast)}${slider('sparkle','Sparkle',p.sparkle)}</div>
-        <div class="button-row"><button data-action="savePattern">Save pattern</button><button data-action="saveParams">Save parameters</button><button data-action="saveMode">Save override</button></div>
+        <div class="field-grid four" style="margin-top:14px">${slider('brightness','Brightness',p.brightness)}${slider('speed','Speed',p.speed)}${slider('scale','Scale',p.scale,2,.01)}${slider('density','Density',p.density)}${colorPicker('hue','Primary color',hueHex)}${colorPicker('hue2','Secondary color',hue2Hex)}${slider('contrast','Contrast',p.contrast)}${slider('sparkle','Sparkle',p.sparkle)}</div>
       </form>
     </div>
     <div class="subpanel"><h3>Maintenance</h3>
@@ -147,31 +150,11 @@ function wireDialog(d){
   body.querySelectorAll('input[type=range]').forEach(input=>{
     input.oninput=()=>body.querySelector(`[data-value-for="${input.name}"]`).textContent=num(input.value);
   });
-  body.querySelector('[data-action=saveIdentity]').onclick=async e=>{
-    e.preventDefault();const f=e.target.form;
-    const rn=new FormData();rn.append('name',f.name.value);
-    const renameResult=await postForm(`/api/device/${encodeURIComponent(d.key)}/rename`,rn);
-    if(!renameResult.ok)return;
-    const requested=Number(f.deviceId.value);
-    if(requested&&requested!==Number(d.id)){
-      const id=new FormData();id.append('deviceId',String(requested));
-      const idResult=await postForm(`/api/device/${encodeURIComponent(d.key)}/device-id`,id);
-      if(!idResult.ok)return;
-    }
-    state.dialogDirty=false;await refresh();
-  };
-  body.querySelector('[data-action=saveConfig]').onclick=async e=>{
-    e.preventDefault();const f=e.target.form,fd=new FormData();
-    for(const n of ['hasScale','isJelly','isBig'])if(f[n].checked)fd.append(n,'true');
-    fd.append('powerLimitMilliAmps',f.powerLimitMilliAmps.value);
-    await saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/config`,fd);
-  };
+  const identityForm=body.querySelector('[data-path=config]');
   body.querySelector('[data-action=identify]').onclick=()=>postForm(`/api/device/${encodeURIComponent(d.key)}/identify`,new FormData());
   body.querySelector('[data-action=tare]').onclick=()=>saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/tare`,new FormData());
   const posForm=body.querySelector('[data-submit=position]');
-  posForm.onsubmit=async e=>{
-    e.preventDefault();await saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/position`,e.target);
-  };
+  posForm.onsubmit=e=>e.preventDefault();
   const posXHidden=posForm.elements.posX,posZHidden=posForm.elements.posZ;
   const radiusInput=posForm.elements.radius,azimuthInput=posForm.elements.azimuth;
   const derivedXZ=posForm.querySelector('[data-derived-xz]');
@@ -184,25 +167,47 @@ function wireDialog(d){
   azimuthInput.oninput=syncFromPolar;
   const sensorForm=body.querySelector('[data-submit=sensor]');
   if(sensorForm){
-    sensorForm.onsubmit=async e=>{e.preventDefault();await saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/sensor`,e.target);};
+    sensorForm.onsubmit=e=>e.preventDefault();
     sensorForm.querySelector('[data-action=tareSensor]').onclick=()=>saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/tare`,new FormData());
   }
   const pf=body.querySelector('[data-submit=pattern]');
-  body.querySelector('[data-action=savePattern]').onclick=async e=>{
-    e.preventDefault();const fd=new FormData();fd.append('pattern',pf.pattern.value);
-    await saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/pattern`,fd);
-  };
-  body.querySelector('[data-action=saveParams]').onclick=async e=>{
-    e.preventDefault();const fd=new FormData();
-    for(const n of ['brightness','speed','scale','density','hue','hue2','contrast','sparkle'])fd.append(n,pf[n].value);
-    await saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/pattern-parameters`,fd);
-  };
-  body.querySelector('[data-action=saveMode]').onclick=async e=>{
-    e.preventDefault();const fd=new FormData();const override=pf.mode.value!=='follow';
-    fd.append('localOverride',override?'true':'false');
-    fd.append('mode',override?pf.mode.value:(d.localOverrideMode||'fallback'));
-    fd.append('masterBrightness',String(d.masterBrightness??1));
-    await saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/show`,fd);
+  document.getElementById('dialogSaveAll').onclick=async()=>{
+    const rn=new FormData();rn.append('name',identityForm.name.value);
+    const renameResult=await request(`/api/device/${encodeURIComponent(d.key)}/rename`,{method:'POST',body:rn});
+    if(!renameResult.ok){showToast(renameResult);return;}
+    const requested=Number(identityForm.deviceId.value);
+    if(requested&&requested!==Number(d.id)){
+      const id=new FormData();id.append('deviceId',String(requested));
+      const idResult=await request(`/api/device/${encodeURIComponent(d.key)}/device-id`,{method:'POST',body:id});
+      if(!idResult.ok){showToast(idResult);return;}
+    }
+    const configFd=new FormData();
+    for(const n of ['hasScale','isJelly','isBig'])if(identityForm[n].checked)configFd.append(n,'true');
+    configFd.append('powerLimitMilliAmps',identityForm.powerLimitMilliAmps.value);
+    const configResult=await request(`/api/device/${encodeURIComponent(d.key)}/config`,{method:'POST',body:configFd});
+    if(!configResult.ok){showToast(configResult);return;}
+    const posResult=await request(`/api/device/${encodeURIComponent(d.key)}/position`,{method:'POST',body:new FormData(posForm)});
+    if(!posResult.ok){showToast(posResult);return;}
+    if(sensorForm){
+      const sensorResult=await request(`/api/device/${encodeURIComponent(d.key)}/sensor`,{method:'POST',body:new FormData(sensorForm)});
+      if(!sensorResult.ok){showToast(sensorResult);return;}
+    }
+    const patternFd=new FormData();patternFd.append('pattern',pf.pattern.value);
+    const patternResult=await request(`/api/device/${encodeURIComponent(d.key)}/pattern`,{method:'POST',body:patternFd});
+    if(!patternResult.ok){showToast(patternResult);return;}
+    const paramsFd=new FormData();
+    for(const n of ['brightness','speed','scale','density','contrast','sparkle'])paramsFd.append(n,pf[n].value);
+    paramsFd.append('hue',hexToHue(pf.hue.value));paramsFd.append('hue2',hexToHue(pf.hue2.value));
+    const paramsResult=await request(`/api/device/${encodeURIComponent(d.key)}/pattern-parameters`,{method:'POST',body:paramsFd});
+    if(!paramsResult.ok){showToast(paramsResult);return;}
+    const modeFd=new FormData();const override=pf.mode.value!=='follow';
+    modeFd.append('localOverride',override?'true':'false');
+    modeFd.append('mode',override?pf.mode.value:(d.localOverrideMode||'fallback'));
+    modeFd.append('masterBrightness',String(d.masterBrightness??1));
+    const modeResult=await request(`/api/device/${encodeURIComponent(d.key)}/show`,{method:'POST',body:modeFd});
+    if(!modeResult.ok){showToast(modeResult);return;}
+    showToast('All values saved.');
+    state.dialogDirty=false;await refresh();
   };
   body.querySelector('[data-submit=ota]').onsubmit=async e=>{
     e.preventDefault();await saveDeviceForm(`/api/device/${encodeURIComponent(d.key)}/update`,e.target);
