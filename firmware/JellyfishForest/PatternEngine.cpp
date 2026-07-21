@@ -20,8 +20,146 @@ StripBus gStrips[config::kStripCount] = {
 
 constexpr float kSceneTransitionSeconds = 1.8f;
 
+struct FireGradientStop {
+  float position;
+  float r;
+  float g;
+  float b;
+};
+
+const FireGradientStop kFireBellOuter[4] = {
+    {0.00f, 1.0f, 1.0f, 1.0f},
+    {0.20f, 1.0f, 1.0f, 0.0f},
+    {0.40f, 1.0f, 0.2f, 0.0f},
+    {0.80f, 1.0f, 0.0f, 0.0f},
+};
+const FireGradientStop kFireGreenBellOuter[4] = {
+    {0.00f, 1.0f, 1.0f, 1.0f},
+    {0.20f, 0.6f, 1.0f, 0.0f},
+    {0.40f, 0.1f, 0.9f, 0.0f},
+    {0.80f, 0.0f, 0.4f, 0.0f},
+};
+const FireGradientStop kFireBlueBellOuter[4] = {
+    {0.00f, 1.0f, 1.0f, 1.0f},
+    {0.20f, 0.4f, 0.8f, 1.0f},
+    {0.40f, 0.1f, 0.3f, 1.0f},
+    {0.80f, 0.1f, 0.0f, 0.6f},
+};
+const FireGradientStop kFireInner[4] = {
+    {0.00f, 1.0f, 1.0f, 1.0f},
+    {0.20f, 1.0f, 1.0f, 0.0f},
+    {0.50f, 1.0f, 0.2f, 0.0f},
+    {0.90f, 1.0f, 0.0f, 0.0f},
+};
+const FireGradientStop kFireGreenInner[4] = {
+    {0.00f, 1.0f, 1.0f, 1.0f},
+    {0.20f, 0.6f, 1.0f, 0.0f},
+    {0.50f, 0.1f, 0.9f, 0.0f},
+    {0.90f, 0.0f, 0.4f, 0.0f},
+};
+const FireGradientStop kFireBlueInner[4] = {
+    {0.00f, 1.0f, 1.0f, 1.0f},
+    {0.20f, 0.4f, 0.8f, 1.0f},
+    {0.50f, 0.1f, 0.3f, 1.0f},
+    {0.90f, 0.1f, 0.0f, 0.6f},
+};
+
 ColorF white(float value) {
   return {value, value, value};
+}
+
+float legacyRippleProfile(float x) {
+  if (x <= -2.0f || x >= 2.0f) return 0.0f;
+  const float x2 = x * x;
+  const float a = x2 - 4.0f;
+  const float b = x2 - 1.0f;
+  return clamp01((a * a * b * b) / 16.0f);
+}
+
+ColorF sampleFireGradient(const FireGradientStop* stops, float position) {
+  const float p = clamp01(position);
+  if (p <= stops[0].position) {
+    return {stops[0].r, stops[0].g, stops[0].b};
+  }
+  if (p >= stops[3].position) {
+    return {stops[3].r, stops[3].g, stops[3].b};
+  }
+  for (uint8_t index = 1; index < 4; ++index) {
+    if (p <= stops[index].position) {
+      const FireGradientStop& a = stops[index - 1];
+      const FireGradientStop& b = stops[index];
+      const float amount = (p - a.position) / (b.position - a.position);
+      return {
+          lerp(a.r, b.r, amount),
+          lerp(a.g, b.g, amount),
+          lerp(a.b, b.b, amount),
+      };
+    }
+  }
+  return {stops[3].r, stops[3].g, stops[3].b};
+}
+
+ColorF blendFireGradients(
+    const FireGradientStop* from,
+    const FireGradientStop* to,
+    float position,
+    float amount) {
+  return lerpColor(
+      sampleFireGradient(from, position),
+      sampleFireGradient(to, position),
+      clamp01(amount));
+}
+
+ColorF cyclingFireColor(
+    const FireGradientStop* redGradient,
+    const FireGradientStop* greenGradient,
+    const FireGradientStop* blueGradient,
+    float position,
+    float timeSeconds,
+    uint16_t deviceId) {
+  // Preserve the original red -> green -> blue progression, then smoothly
+  // return through magenta/orange to the red/yellow fire palette and repeat.
+  // The transition remains staggered between jellyfish, just like the ported
+  // implementation, but no longer becomes permanently blue.
+  constexpr float kRedHoldEnd = 30.0f;
+  constexpr float kGreenTransitionEnd = 50.0f;
+  constexpr float kGreenHoldEnd = 55.0f;
+  constexpr float kBlueTransitionEnd = 75.0f;
+  constexpr float kBlueHoldEnd = 85.0f;
+  constexpr float kCycleEnd = 105.0f;
+  constexpr float kJellyStaggerSeconds = 1.5f;
+
+  const float staggeredTime = max(
+      0.0f,
+      timeSeconds - static_cast<float>(deviceId) * kJellyStaggerSeconds);
+  const float cycleTime = fmodf(staggeredTime, kCycleEnd);
+
+  if (cycleTime < kRedHoldEnd) {
+    return sampleFireGradient(redGradient, position);
+  }
+  if (cycleTime < kGreenTransitionEnd) {
+    const float amount = (cycleTime - kRedHoldEnd) /
+        (kGreenTransitionEnd - kRedHoldEnd);
+    return blendFireGradients(
+        redGradient, greenGradient, position, amount);
+  }
+  if (cycleTime < kGreenHoldEnd) {
+    return sampleFireGradient(greenGradient, position);
+  }
+  if (cycleTime < kBlueTransitionEnd) {
+    const float amount = (cycleTime - kGreenHoldEnd) /
+        (kBlueTransitionEnd - kGreenHoldEnd);
+    return blendFireGradients(
+        greenGradient, blueGradient, position, amount);
+  }
+  if (cycleTime < kBlueHoldEnd) {
+    return sampleFireGradient(blueGradient, position);
+  }
+
+  const float amount = (cycleTime - kBlueHoldEnd) /
+      (kCycleEnd - kBlueHoldEnd);
+  return blendFireGradients(
+      blueGradient, redGradient, position, amount);
 }
 
 }  // namespace
@@ -83,6 +221,9 @@ void PatternEngine::beginSceneTransition(SceneId next, uint64_t localNowMs) {
   captureDisplayedFrame();
   scene_ = next;
   transitionStartedLocalMs_ = localNowMs;
+  if (next == SceneId::LegacyFallback) {
+    legacyPatternInitialized_ = false;
+  }
   Log.printf("Scene changed to %s\n", sceneName(scene_));
 }
 
@@ -271,10 +412,18 @@ void PatternEngine::renderLegacy(float showSeconds, const AudioState& audio) {
     selected = demoPatterns[index];
   }
 
+  if (!legacyPatternInitialized_ || selected != activeLegacyPattern_) {
+    activeLegacyPattern_ = selected;
+    legacyPatternStartedShowSeconds_ = showSeconds;
+    legacyPatternInitialized_ = true;
+    rippleCycle_ = UINT32_MAX;
+  }
+  const float patternSeconds = max(0.0f, showSeconds - legacyPatternStartedShowSeconds_);
+
   const uint16_t count = geometry_.ledCountPerStrip();
   for (uint8_t strip = 0; strip < config::kStripCount; ++strip) {
     for (uint16_t pixel = 0; pixel < count; ++pixel) {
-      frame_[strip][pixel] = legacyPixel(selected, strip, pixel, showSeconds, audio);
+      frame_[strip][pixel] = legacyPixel(selected, strip, pixel, patternSeconds, audio);
     }
   }
 }
@@ -284,7 +433,7 @@ ColorF PatternEngine::legacyPixel(
     uint8_t strip,
     uint16_t pixel,
     float showSeconds,
-    const AudioState& audio) const {
+    const AudioState& audio) {
   const PatternParameters& p = settings_.pattern;
   const Vec3 local = geometry_.localPosition(strip, pixel);
   const PathCoordinate path = geometry_.pathCoordinate(pixel);
@@ -305,20 +454,128 @@ ColorF PatternEngine::legacyPixel(
       return hsv(p.hue, 0.90f, level * radial);
     }
     case PatternId::Ripple: {
-      const float radial = sqrtf(local.x * local.x + local.y * local.y + local.z * local.z);
-      const float wave = fmodf(showSeconds * speed * 1.7f, 4.0f + scale * 2.0f);
-      const float distanceToWave = fabsf(radial - wave);
-      const float intensity = expf(-distanceToWave * distanceToWave / 0.05f);
-      return hsv(p.hue, 0.82f, intensity);
+      // The original local ripple chose a new arbitrary 3-D origin for each
+      // long cycle. Preserve that stateful behaviour instead of measuring all
+      // waves from the jellyfish origin.
+      const float cycleSeconds = lerp(80.0f, 15.0f, p.density);
+      const uint32_t cycle = static_cast<uint32_t>(floorf(showSeconds / cycleSeconds));
+      const float cycleTime = showSeconds - cycle * cycleSeconds;
+      const float centerExtent = 1.0f + p.scale;  // default: original +/-2 m
+      if (cycle != rippleCycle_) {
+        rippleCycle_ = cycle;
+        rippleCenter_ = Vec3(
+            lerp(-centerExtent, centerExtent,
+                 (esp_random() & 0x00FFFFFFU) / 16777215.0f),
+            lerp(-geometry_.maximumDepthMeters(), 0.5f,
+                 (esp_random() & 0x00FFFFFFU) / 16777215.0f),
+            lerp(-centerExtent, centerExtent,
+                 (esp_random() & 0x00FFFFFFU) / 16777215.0f));
+        Log.printf(
+            "Ripple centre: %.2f, %.2f, %.2f\n",
+            rippleCenter_.x, rippleCenter_.y, rippleCenter_.z);
+      }
+      const float waveVelocity = lerp(2.2f, 9.1f, p.speed);
+      const float wavePosition = cycleTime * waveVelocity;
+      const float waveX = wavePosition - distance(rippleCenter_, local) * 10.0f - 2.0f;
+      float intensity = legacyRippleProfile(waveX);
+      // At the default contrast this is effectively the original profile.
+      intensity = powf(intensity, 0.45f + p.contrast * 0.85f);
+      return scaleColor(hsv(p.hue, 0.92f, 1.0f), intensity);
     }
     case PatternId::FireSpread: {
-      const float deviceDelay = settings_.deviceId * (0.25f + (1.0f - p.density) * 1.2f);
-      const float elapsed = max(0.0f, showSeconds - deviceDelay);
-      const float reach = clamp01(elapsed * speed * 0.08f);
-      const float front = smoothstep(path.pathT, min(1.0f, path.pathT + 0.14f), reach);
-      const float flicker = 0.52f + 0.48f * sinf(showSeconds * (4.0f + speed * 3.0f) + ledKey * 0.27f);
-      const float hue = lerp(0.01f, p.hue2, clamp01(elapsed * 0.008f));
-      return hsv(hue, 0.94f, front * (0.42f + 0.58f * flicker));
+      // Restores the full ported fireSpread animation: pre-ignition,
+      // per-jelly staggering, radial growth, breathing, independent strip
+      // pulses, flicker, and the red -> green -> blue gradient evolution.
+      const float bellFraction = 0.50f;
+      const float tempo = 0.55f + p.speed;  // default speed 0.45 -> 1.0x
+      const float time = showSeconds * tempo;
+      const float spreadStagger = 2.0f * max(0.35f, 1.45f - p.density);
+      const float ignitionTime = settings_.deviceId == 0
+          ? 0.0f
+          : 8.0f + (settings_.deviceId - 1) * spreadStagger;
+      const float jellyElapsed = time - ignitionTime;
+
+      const float globalBreath = 0.12f * (
+          0.65f * sinf(time * 0.75f) +
+          0.35f * sinf(time * 0.75f * 2.3f));
+
+      float gradientPosition = 0.0f;
+      float fromRoot = 0.0f;
+      const FireGradientStop* redGradient = kFireBellOuter;
+      const FireGradientStop* greenGradient = kFireGreenBellOuter;
+      const FireGradientStop* blueGradient = kFireBlueBellOuter;
+
+      if (path.segment == JellySegment::Bell) {
+        gradientPosition = path.segmentT * bellFraction;
+        fromRoot = path.segmentT * 0.5f;
+      } else if (path.segment == JellySegment::Outer) {
+        gradientPosition = bellFraction + path.segmentT * (1.0f - bellFraction);
+        fromRoot = 0.5f + path.segmentT * 0.5f;
+      } else {
+        gradientPosition = 1.0f - path.segmentT;
+        fromRoot = 1.0f - path.segmentT;
+        redGradient = kFireInner;
+        greenGradient = kFireGreenInner;
+        blueGradient = kFireBlueInner;
+      }
+
+      const float fadeWidth = max(0.08f, 0.20f * (1.5f - 0.5f * p.scale));
+      ColorF color;
+      float intensity = 0.0f;
+
+      if (jellyElapsed <= 0.0f) {
+        const float preProgress = clamp01(
+            (time - (ignitionTime - 4.0f)) / 4.0f);
+        if (preProgress <= 0.0f) return {};
+        const float preScale = 0.40f * preProgress * preProgress;
+        const float segmentAlpha = clamp01((preScale - fromRoot) / fadeWidth);
+        if (segmentAlpha <= 0.0f) return {};
+        color = cyclingFireColor(
+            redGradient,
+            greenGradient,
+            blueGradient,
+            gradientPosition,
+            time,
+            settings_.deviceId);
+        intensity = preProgress * 0.08f * segmentAlpha;
+        return scaleColor(color, intensity);
+      }
+
+      const float growProgress = clamp01((jellyElapsed - 2.0f) / 15.0f);
+      const float currentScale = 0.40f + 0.60f * growProgress;
+      const float energyProgress = clamp01((jellyElapsed - 17.0f) / 20.0f);
+      const float stripAmplitude = lerp(0.09f, 0.38f, energyProgress);
+      const float shrinkMaximum = lerp(0.30f, 0.62f, energyProgress);
+      const float stripPhase = strip * 2.3999f;
+      const float stripPulse = stripAmplitude * (
+          0.5f * sinf(time * 1.5f + stripPhase) +
+          0.3f * sinf(time * 1.5f * 2.1f + stripPhase * 1.6f) +
+          0.2f * sinf(time * 1.5f * 3.7f + stripPhase * 0.9f));
+      const float floorScale = max(0.40f, currentScale - shrinkMaximum);
+      const float effectiveScale = min(
+          1.0f, max(floorScale, currentScale + globalBreath + stripPulse));
+      const float segmentAlpha = clamp01((effectiveScale - fromRoot) / fadeWidth);
+      if (segmentAlpha <= 0.0f) return {};
+
+      const float wobbleAmplitude = 0.10f * (0.5f + 0.75f * p.contrast);
+      const float wavePosition = gradientPosition + wobbleAmplitude *
+          sinf(gradientPosition * 5.0f - time * 10.5f);
+      color = cyclingFireColor(
+          redGradient,
+          greenGradient,
+          blueGradient,
+          wavePosition,
+          time,
+          settings_.deviceId);
+
+      const float kindleProgress = min(1.0f, jellyElapsed / 2.0f);
+      const float flickerAmplitude = min(1.0f,
+          0.90f * (0.5f + 0.77f * p.contrast)) * kindleProgress;
+      const float flicker = 1.0f - flickerAmplitude *
+          (0.5f + 0.5f * sinf(time * 3.0f + ledKey * 0.53f));
+      const float baseIntensity = 0.08f + 0.92f * kindleProgress;
+      intensity = baseIntensity * flicker * segmentAlpha;
+      return scaleColor(color, intensity);
     }
     case PatternId::Waterfall: {
       const float cycles = 1.0f + scale * 1.6f;
@@ -370,9 +627,32 @@ ColorF PatternEngine::legacyPixel(
       return forestPixel(strip, pixel, showSeconds, simulated, 0.0f, simulated.agitation);
     }
     case PatternId::InnerSpreadWave: {
-      const float wave = max(0.0f, sinf(path.pathT * (8.0f + scale * 5.0f) - showSeconds * speed));
-      const float hue = path.segment == JellySegment::Inner ? p.hue2 : p.hue;
-      return hsv(hue, 0.86f, powf(wave, 1.6f));
+      // The folded inner path carries a narrow secondary-colour crest. The
+      // bell and outer branches stay fully lit in the primary colour between
+      // crests, then crossfade through a genuine colour mixture into the
+      // secondary colour as the wave passes. This matches the original
+      // red-on-blue construction; the previous shoulder-only term peaked at
+      // just 25%, making the primary colour nearly disappear.
+      const float wormFrequency = 11.0f + p.scale * 6.0f;  // default: 17
+      const float waveSpeed = 0.45f + p.speed * 1.67f;     // default: 1.2
+      const float jellyPhase = 0.25f + p.density * 1.22f; // default: 0.8
+      const float wave = max(0.0f, sinf(
+          path.pathT * wormFrequency -
+          showSeconds * waveSpeed +
+          settings_.deviceId * jellyPhase));
+
+      const ColorF secondary = hsv(p.hue2, 0.96f, 1.0f);
+      if (path.segment == JellySegment::Inner) {
+        const float crestPower = 1.35f + p.contrast;  // default: 2.0
+        return scaleColor(secondary, powf(wave, crestPower));
+      }
+
+      const ColorF primary = hsv(p.hue, 0.94f, 1.0f);
+      // Default contrast gives an almost exactly linear crossfade, matching
+      // the original `primary * (1-wave) + secondary * wave` behaviour.
+      const float mixPower = 0.65f + p.contrast * 0.54f;
+      const float colorMix = powf(wave, mixPower);
+      return lerpColor(primary, secondary, colorMix);
     }
     case PatternId::RainbowWave: {
       const float hue = path.pathT * scale + strip / 8.0f + showSeconds * speed * 0.08f;

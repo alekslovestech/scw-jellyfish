@@ -71,7 +71,7 @@ class PatternEngine {
       uint8_t strip,
       uint16_t pixel,
       float showSeconds,
-      const AudioState& audio) const;
+      const AudioState& audio);
 
   void overlayActivationWaves(uint64_t showNowMs);
   void applyIdentifyOverlay(uint64_t localNowMs);
@@ -92,6 +92,11 @@ class PatternEngine {
   uint64_t transitionStartedLocalMs_ = 0;
   uint64_t identifyUntilLocalMs_ = 0;
   uint64_t renderedFrames_ = 0;
+  bool legacyPatternInitialized_ = false;
+  PatternId activeLegacyPattern_ = PatternId::None;
+  float legacyPatternStartedShowSeconds_ = 0.0f;
+  uint32_t rippleCycle_ = UINT32_MAX;
+  Vec3 rippleCenter_;
 };
 
 }  // namespace jelly
