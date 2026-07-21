@@ -1,0 +1,21 @@
+{
+  "mode": "auto",
+  "masterBrightness": 1.0,
+  "expectedPlatformCount": 4,
+  "influenceRadiusMeters": 5.0,
+  "calmThreshold": 0.86,
+  "calmReleaseThreshold": 0.68,
+  "maxAgitationForChorus": 0.16,
+  "allCalmHoldSeconds": 12.0,
+  "chorusFadeSeconds": 8.0,
+  "activationWaveSpeedMetersPerSecond": 5.5,
+  "activationWaveWidthMeters": 0.65,
+  "activationWaveDurationSeconds": 5.0,
+  "mapMinX": -10.0,
+  "mapMaxX": 10.0,
+  "mapMinZ": -10.0,
+  "mapMaxZ": 10.0,
+  "audioEnabled": false,
+  "audioHost": "127.0.0.1",
+  "audioPort": 9000
+}

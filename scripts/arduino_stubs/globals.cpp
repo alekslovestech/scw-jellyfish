@@ -1,0 +1,9 @@
+#include "Arduino.h"
+#include "ESPmDNS.h"
+#include "Update.h"
+#include "WiFi.h"
+SerialClass Serial;
+ESPClass ESP;
+MDNSClass MDNS;
+UpdateClass Update;
+WiFiClass WiFi;

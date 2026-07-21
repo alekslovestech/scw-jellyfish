@@ -1,0 +1,20 @@
+Wi-Fi configuration
+===================
+
+Edit Secrets.h, not Secrets.example.h.
+
+Set:
+  #define JELLY_WIFI_SSID_1 "SCW"
+  #define JELLY_WIFI_PASSWORD_1 "your-password"
+
+The static address is 192.168.0.(100 + device ID).
+Device ID 16 therefore uses 192.168.0.116.
+
+At boot, the expected messages are:
+  Device ID 16, using static IP 192.168.0.116 ...
+  Connecting to Wi-Fi SCW
+  Network ready: 192.168.0.116 (SCW)
+  HTTP API listening on 192.168.0.116:80
+
+If the log says "No Wi-Fi credentials configured", the macros above are still empty
+or the edited file is not named exactly Secrets.h in the sketch directory.

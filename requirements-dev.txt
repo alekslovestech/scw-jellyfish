@@ -1,0 +1,3 @@
+-r dashboard/requirements.txt
+numpy
+pytest

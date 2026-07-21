@@ -1,7 +1,23 @@
-build/
-dist/
-node_modules/
-*.pyc
-.vs/
-.venv/
+# Python
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local show state
+/dashboard/show_settings.json
+
+# Firmware secrets and builds
+/firmware/JellyfishForest/Secrets.h
+/firmware/.pio/
+.pio/
+*.bin
+*.elf
+*.map
+
+# Editors / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
