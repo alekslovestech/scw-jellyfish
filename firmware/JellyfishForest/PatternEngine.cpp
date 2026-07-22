@@ -76,6 +76,30 @@ float legacyRippleProfile(float x) {
   return clamp01((a * a * b * b) / 16.0f);
 }
 
+// A sine crest with a true zero interval. `darkness` raises the cutoff and
+// therefore widens the black gap between consecutive crests; `power` sharpens
+// the surviving light. Unlike a conventional 0.5 + 0.5 * sin() wave, this can
+// never create an all-pixel illumination floor.
+float deepCrest(float phase, float darkness, float power) {
+  const float threshold = lerp(-0.22f, 0.58f, clamp01(darkness));
+  const float wave = sinf(phase);
+  if (wave <= threshold) return 0.0f;
+  const float normalized = clamp01((wave - threshold) / (1.0f - threshold));
+  return powf(normalized, max(0.25f, power));
+}
+
+// Matches the root-to-branch coordinate used by the proven FireSpread
+// fallback. Zero is the bell centre/root; one is the end of the active branch.
+float fireRootCoordinate(const PathCoordinate& path) {
+  if (path.segment == JellySegment::Bell) {
+    return path.segmentT * 0.5f;
+  }
+  if (path.segment == JellySegment::Outer) {
+    return 0.5f + path.segmentT * 0.5f;
+  }
+  return 1.0f - path.segmentT;
+}
+
 ColorF sampleFireGradient(const FireGradientStop* stops, float position) {
   const float p = clamp01(position);
   if (p <= stops[0].position) {
@@ -312,7 +336,6 @@ ColorF PatternEngine::forestPixel(
     float chorusAmount,
     float simulatedAgitation) const {
   const Vec3 local = geometry_.localPosition(strip, pixel);
-  const Vec3 world = geometry_.worldPosition(strip, pixel);
   const PathCoordinate path = geometry_.pathCoordinate(pixel);
   const uint32_t ledKey =
       settings_.deviceId * 100003U + strip * 4099U + pixel * 97U;
@@ -435,99 +458,259 @@ ColorF PatternEngine::forestPixel(
         hsv(rippleHue, 0.82f, rippleIntensity));
   }
 
+  const float presence = clamp01(field.presence);
   const float agitation = clamp01(max(field.agitation, simulatedAgitation));
-  const float turbulence = clamp01(max(field.turbulence, simulatedAgitation));
+  const float calmness = clamp01(field.calmness);
 
   // For an empty field, the sparse ambient events above are the entire
-  // scene. Avoiding the old all-pixel breathing calculations also reduces
-  // work on the ESP while the installation is idle.
-  if (field.presence < 0.002f &&
+  // scene. Avoiding the interactive calculations also reduces work on the
+  // ESP while the installation is idle.
+  if (presence < 0.002f &&
       agitation < 0.002f &&
       chorusAmount < 0.002f) {
     return ambient;
   }
 
   // -----------------------------------------------------------------------
-  // Interactive field
+  // Interactive field: coordinated deep waves
   // -----------------------------------------------------------------------
-  // This keeps the previous agitation/calmness language. Occupancy supplies
-  // its own brightness floor so removing the ambient wash does not make an
-  // occupied platform response dimmer or dependent on agitation.
-  const float speed = 0.18f + settings_.pattern.speed * 0.42f;
-  const float scale = 0.45f + settings_.pattern.scale * 0.70f;
+  // There is no occupied-pixel floor. Every interactive photon is carried by
+  // a thresholded crest, so each pixel can return to exact black between
+  // waves. Calmness is deliberately rewarding in three simultaneous ways:
+  //   1. crests become much brighter,
+  //   2. strip/device phases converge on the shared installation clock, and
+  //   3. the FireSpread-like root wave joins the InnerSpread-like path wave.
+  // Agitation applies an immediate amplitude penalty and restores private,
+  // rapidly moving phases before the slower calmness value has time to fall.
 
-  const float devicePhase =
-      settings_.deviceId * 1.371f +
-      settings_.position.x * 0.17f +
-      settings_.position.z * 0.11f;
-  const float synchronizedPhase =
-      (1.0f - field.synchronization) * devicePhase;
+  const float calmReward = powf(calmness, 1.35f);
+  const float agitationPenalty = lerp(1.0f, 0.28f, agitation);
+  const float coherence = clamp01(
+      calmReward * (1.0f - 0.94f * agitation));
 
-  const float slowBreath = 0.5f + 0.5f * sinf(showSeconds * speed + synchronizedPhase);
-  const float worldWave = 0.5f + 0.5f * sinf(
-      world.y * 0.58f * scale +
-      world.x * 0.16f +
-      world.z * 0.13f -
-      showSeconds * speed * 0.73f +
-      synchronizedPhase);
-  const float bellBreath = 0.5f + 0.5f * sinf(
-      path.pathT * 5.4f - showSeconds * speed * 0.52f + synchronizedPhase * 0.6f);
+  // Device position creates a continuous phase field through the forest. At
+  // high calmness nearby jellyfish therefore move together without every
+  // jellyfish in the room being forced to the exact same point in the wave.
+  const float installationPhase =
+      settings_.position.x * 0.31f +
+      settings_.position.z * 0.27f +
+      settings_.position.y * 0.035f;
+  const float privatePhase =
+      settings_.deviceId * 1.371f + strip * 2.3999f;
+  const float phaseOffset = lerp(
+      privatePhase, installationPhase, coherence);
 
-  const float chaotic = 0.5f + 0.5f * sinf(
-      world.x * (3.2f + 5.0f * agitation) +
-      world.z * (2.4f + 4.0f * agitation) +
-      path.pathT * 18.0f -
-      showSeconds * (1.8f + settings_.pattern.speed * 5.0f) +
-      strip * 1.7f);
+  const float baseSpeed = 0.62f + settings_.pattern.speed * 1.18f;
+  const float waveSpeed = baseSpeed *
+      (1.0f + agitation * 2.4f - calmReward * 0.12f);
+  const float frequency = 10.5f + settings_.pattern.scale * 6.0f;
 
-  const float calmSmooth = lerp(worldWave * 0.55f + bellBreath * 0.45f, slowBreath, field.harmony * 0.70f);
-  const float motion = lerp(calmSmooth, chaotic, turbulence);
+  // Agitation makes the wave visibly lose its shape. The phase damage is
+  // strip- and pixel-dependent but remains deterministic, avoiding random
+  // discontinuities in the renderer itself.
+  const float fragmentPhase = agitation * (
+      strip * 0.92f +
+      1.65f * sinf(
+          showSeconds * (2.4f + agitation * 3.6f) +
+          path.pathT * 22.0f +
+          hash01(ledKey ^ 0xA4093822U) * TWO_PI));
 
-  const float occupiedLight = field.brightness * (0.43f + 0.10f * calmSmooth);
-  const float energeticLight = agitation * field.presence * (0.18f + 0.17f * chaotic);
-  // At the centre of one platform's field, presence tops out near 0.86. This
-  // coefficient restores approximately the brightness that the former
-  // always-on ambient wash contributed there, without relighting distant or
-  // unoccupied jellyfish.
-  const float occupiedFloor = field.presence * (0.21f + 0.07f * field.calmness);
-  float intensity = occupiedFloor + occupiedLight + energeticLight;
-  intensity *= 0.86f + settings_.pattern.contrast * (0.20f + 0.10f * motion);
-  intensity = min(1.15f, intensity);
+  // The existing Contrast control is now the useful "wave depth" control:
+  // higher values raise the cutoff, producing longer passages of black.
+  const float waveDarkness = clamp01(
+      0.47f + settings_.pattern.contrast * 0.42f +
+      agitation * 0.16f - calmReward * 0.16f);
+  const float wavePower =
+      1.15f + settings_.pattern.contrast * 2.10f +
+      agitation * 0.90f - calmReward * 0.35f;
 
-  const float baseHue = settings_.pattern.hue;
-  const float secondHue = settings_.pattern.hue2;
-  const float hueDrift = 0.025f * sinf(showSeconds * 0.11f + world.y * 0.22f);
-  ColorF cool = hsv(lerp(baseHue, secondHue, 0.25f + 0.45f * worldWave) + hueDrift, 0.78f, intensity);
+  const float pathPhase =
+      path.pathT * frequency -
+      showSeconds * waveSpeed +
+      phaseOffset + fragmentPhase;
+  const float root = fireRootCoordinate(path);
+  const float spreadPhase =
+      root * (7.5f + settings_.pattern.scale * 5.0f) +
+      showSeconds * waveSpeed * 0.72f +
+      phaseOffset * 0.62f -
+      installationPhase * 0.35f +
+      fragmentPhase * 0.55f + PI * 0.35f;
 
-  const ColorF agitated = hsv(
-      lerp(0.96f, 0.08f, chaotic),
-      0.86f,
-      intensity * (0.95f + 0.20f * chaotic));
-  ColorF calmPearl = lerpColor(
-      hsv(0.49f + 0.05f * worldWave, 0.48f, intensity * 1.08f),
-      hsv(0.12f, 0.32f, intensity * 1.05f),
-      0.25f + 0.25f * bellBreath);
+  const float pathCrest = deepCrest(
+      pathPhase, waveDarkness, wavePower);
+  const float spreadCrest = deepCrest(
+      spreadPhase,
+      clamp01(waveDarkness + 0.045f),
+      wavePower + 0.25f);
 
-  ColorF result = lerpColor(cool, agitated, turbulence * 0.82f);
-  result = lerpColor(result, calmPearl, field.harmony * 0.78f + chorusAmount * 0.15f);
-  return addColor(ambient, result);
+  float structure = pathCrest;
+  if (path.segment == JellySegment::Inner) {
+    // InnerSpreadWave language: a narrow travelling worm on the folded core.
+    structure = max(pathCrest, spreadCrest * calmReward * 0.52f);
+  } else {
+    // FireSpread language: as calmness grows, a coherent root-to-branch wave
+    // becomes as important as the path worm on the bell and outer branches.
+    structure = max(
+        pathCrest * 0.84f,
+        spreadCrest * (0.38f + calmReward * 0.62f));
+  }
+
+  // Low-calm or agitated motion breaks into independent strip pulses. Those
+  // pulses converge into one slow, shared modulation as coherence builds.
+  const float brokenModulation =
+      0.20f + 0.80f * deepCrest(
+          showSeconds * (2.1f + agitation * 5.0f) +
+          strip * 2.3999f +
+          path.pathT * 6.8f,
+          0.38f + agitation * 0.25f,
+          1.35f + agitation);
+  const float sharedModulation =
+      0.80f + 0.20f * (
+          0.5f + 0.5f * sinf(showSeconds * 0.47f + installationPhase));
+  const float modulation = lerp(
+      brokenModulation, sharedModulation, coherence);
+
+  // Calmness is the principal source of brightness. Agitation is still very
+  // visible because it accelerates and warms the fragments, but it is never a
+  // visual reward: it immediately cuts the available amplitude by up to 72%.
+  const float amplitude =
+      presence *
+      lerp(0.22f, 1.02f, calmReward) *
+      agitationPenalty;
+  const float segmentBoost = path.segment == JellySegment::Inner
+      ? 1.08f
+      : (path.segment == JellySegment::Bell ? 1.00f : 0.93f);
+  float intensity = amplitude * structure * modulation * segmentBoost;
+
+  // Aligned path and spread crests receive a small pearl highlight. This
+  // creates the beautiful high-energy intersections without filling valleys.
+  const float intersection = min(pathCrest, spreadCrest);
+  intensity *= 1.0f + intersection * calmReward * 0.24f;
+  intensity = min(1.18f, intensity);
+
+  const float hueDrift =
+      0.018f * sinf(showSeconds * 0.13f + path.pathT * 4.0f);
+  const ColorF primary = hsv(
+      settings_.pattern.hue + hueDrift,
+      0.88f,
+      1.0f);
+  const ColorF secondary = hsv(
+      settings_.pattern.hue2 - hueDrift * 0.6f,
+      0.82f,
+      1.0f);
+
+  ColorF calmColor;
+  if (path.segment == JellySegment::Inner) {
+    calmColor = secondary;
+  } else {
+    // Outer branches mix the two colours as in InnerSpreadWave, but the
+    // mixture is multiplied by the deep-wave envelope rather than left on.
+    const float colorMix = clamp01(
+        0.12f + pathCrest * 0.56f + spreadCrest * 0.34f);
+    calmColor = lerpColor(primary, secondary, colorMix);
+  }
+
+  const ColorF pearl = hsv(
+      0.12f + 0.02f * sinf(showSeconds * 0.19f),
+      0.20f,
+      1.0f);
+  calmColor = lerpColor(
+      calmColor,
+      pearl,
+      calmReward * intersection * 0.48f);
+
+  const float angryMix =
+      0.5f + 0.5f * sinf(
+          showSeconds * (3.4f + agitation * 4.0f) +
+          strip * 1.7f + path.pathT * 17.0f);
+  const ColorF agitatedColor = lerpColor(
+      hsv(0.01f, 0.98f, 1.0f),
+      hsv(0.115f, 0.96f, 1.0f),
+      angryMix);
+
+  const ColorF waveColor = lerpColor(
+      calmColor,
+      agitatedColor,
+      agitation * 0.90f);
+  return addColor(ambient, scaleColor(waveColor, intensity));
 }
 
-ColorF PatternEngine::chorusPixel(uint8_t strip, uint16_t pixel, float showSeconds) const {
-  const Vec3 world = geometry_.worldPosition(strip, pixel);
+ColorF PatternEngine::chorusPixel(
+    uint8_t strip,
+    uint16_t pixel,
+    float showSeconds) const {
+  (void)strip;
   const PathCoordinate path = geometry_.pathCoordinate(pixel);
-  const float speed = 0.34f + settings_.pattern.speed * 0.36f;
+  const float root = fireRootCoordinate(path);
 
-  const float standingA = 0.5f + 0.5f * sinf(
-      world.y * 0.72f + world.x * 0.24f - world.z * 0.18f - showSeconds * speed);
-  const float standingB = 0.5f + 0.5f * sinf(
-      (world.x + world.z) * 0.41f + path.pathT * 3.2f + showSeconds * speed * 0.618f);
-  const float pulse = 0.5f + 0.5f * sinf(showSeconds * 0.47f);
-  const float intensity = 0.62f + 0.22f * standingA + 0.16f * standingB + 0.08f * pulse;
+  // The collective state uses the same two proven visual grammars as the
+  // interactive field, now completely phase-locked by show time and physical
+  // jellyfish position. It is the brightest state, but still has true black
+  // valleys: no constant term is added to `structure` or `intensity`.
+  const float installationPhase =
+      settings_.position.x * 0.31f +
+      settings_.position.z * 0.27f +
+      settings_.position.y * 0.035f;
+  const float speed = 0.68f + settings_.pattern.speed * 1.00f;
+  const float waveDarkness = clamp01(
+      0.45f + settings_.pattern.contrast * 0.35f);
+  const float wavePower =
+      1.10f + settings_.pattern.contrast * 1.75f;
 
-  const ColorF cyan = hsv(0.49f + 0.045f * standingA, 0.42f, intensity);
-  const ColorF pearl = hsv(0.10f + 0.03f * standingB, 0.24f, intensity * 1.06f);
-  return lerpColor(cyan, pearl, 0.30f + 0.35f * standingB);
+  const float pathCrest = deepCrest(
+      path.pathT * (11.0f + settings_.pattern.scale * 5.5f) -
+      showSeconds * speed +
+      installationPhase,
+      waveDarkness,
+      wavePower);
+  const float spreadCrest = deepCrest(
+      root * (8.0f + settings_.pattern.scale * 4.5f) +
+      showSeconds * speed * 0.78f -
+      installationPhase * 0.72f + PI * 0.42f,
+      clamp01(waveDarkness + 0.035f),
+      wavePower + 0.20f);
+
+  const float structure = max(pathCrest, spreadCrest * 0.94f);
+  if (structure <= 0.0f) return {};
+
+  const float intersection = min(pathCrest, spreadCrest);
+  const float globalBreath =
+      0.88f + 0.18f * (
+          0.5f + 0.5f * sinf(showSeconds * 0.39f - installationPhase));
+  const float intensity = min(
+      1.24f,
+      structure * globalBreath + intersection * 0.34f);
+
+  const float hueDrift =
+      0.014f * sinf(showSeconds * 0.16f + path.pathT * 3.0f);
+  const ColorF primary = hsv(
+      settings_.pattern.hue + hueDrift,
+      0.78f,
+      1.0f);
+  const ColorF secondary = hsv(
+      settings_.pattern.hue2 - hueDrift,
+      0.70f,
+      1.0f);
+
+  ColorF color;
+  if (path.segment == JellySegment::Inner) {
+    color = secondary;
+  } else {
+    color = lerpColor(
+        primary,
+        secondary,
+        clamp01(0.18f + pathCrest * 0.52f + spreadCrest * 0.30f));
+  }
+
+  const ColorF pearl = hsv(
+      0.115f + 0.025f * spreadCrest,
+      0.16f,
+      1.0f);
+  color = lerpColor(
+      color,
+      pearl,
+      clamp01(intersection * 0.62f + powf(structure, 4.0f) * 0.14f));
+  return scaleColor(color, intensity);
 }
 
 void PatternEngine::renderLegacy(float showSeconds, const AudioState& audio) {
@@ -752,12 +935,45 @@ ColorF PatternEngine::legacyPixel(
       return hsv(p.hue, 0.72f, intensity);
     }
     case PatternId::MovementSimulation: {
+      // A complete no-hardware demonstration of the global interaction arc:
+      // arrival/low calm -> jostling -> long calm build -> high calm -> a
+      // sudden disappointing disturbance. This is intentionally a test mode,
+      // not a separate artistic fallback pattern.
+      const float cycle = fmodf(showSeconds, 52.0f);
       FieldState simulated;
-      simulated.presence = 0.85f;
-      simulated.agitation = 0.5f + 0.5f * sinf(showSeconds * speed);
-      simulated.turbulence = simulated.agitation;
-      simulated.brightness = 0.75f;
-      return forestPixel(strip, pixel, showSeconds, simulated, 0.0f, simulated.agitation);
+      simulated.presence = 0.86f;
+
+      if (cycle < 8.0f) {
+        simulated.calmness = 0.05f;
+      } else if (cycle < 16.0f) {
+        simulated.agitation =
+            0.72f + 0.28f * (0.5f + 0.5f * sinf(cycle * 3.7f));
+        simulated.calmness = 0.04f;
+      } else if (cycle < 40.0f) {
+        const float settling = smoothstep(16.0f, 40.0f, cycle);
+        simulated.calmness = settling;
+        simulated.agitation = 0.07f * (1.0f - settling);
+      } else if (cycle < 44.0f) {
+        simulated.calmness = 1.0f;
+      } else if (cycle < 46.0f) {
+        // Keep accumulated calmness high for the first instant so the direct
+        // agitation penalty can be seen independently of calmness decay.
+        simulated.calmness = 1.0f;
+        simulated.agitation = smoothstep(44.0f, 44.45f, cycle);
+      } else {
+        const float release = smoothstep(46.0f, 52.0f, cycle);
+        simulated.calmness = 1.0f - release;
+        simulated.agitation = 1.0f - release * 0.78f;
+      }
+
+      simulated.harmony =
+          simulated.presence * simulated.calmness;
+      simulated.synchronization =
+          simulated.presence * powf(simulated.calmness, 1.55f);
+      simulated.turbulence =
+          simulated.presence * simulated.agitation *
+          (1.0f - 0.55f * simulated.calmness);
+      return forestPixel(strip, pixel, showSeconds, simulated, 0.0f);
     }
     case PatternId::InnerSpreadWave: {
       // The folded inner path carries a narrow secondary-colour crest. The
