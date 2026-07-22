@@ -311,8 +311,148 @@ ColorF PatternEngine::forestPixel(
     const FieldState& field,
     float chorusAmount,
     float simulatedAgitation) const {
+  const Vec3 local = geometry_.localPosition(strip, pixel);
   const Vec3 world = geometry_.worldPosition(strip, pixel);
   const PathCoordinate path = geometry_.pathCoordinate(pixel);
+  const uint32_t ledKey =
+      settings_.deviceId * 100003U + strip * 4099U + pixel * 97U;
+
+  // -----------------------------------------------------------------------
+  // Ambient forest
+  // -----------------------------------------------------------------------
+  // Darkness is the default. Individual pixels receive long, independently
+  // phased bioluminescent blooms, and each jellyfish occasionally gets one
+  // much faster spherical shimmer. There is deliberately no permanent base
+  // level: outside these sparse events an unoccupied jellyfish pixel is off.
+
+  const float sparkleControl = clamp01(settings_.pattern.sparkle);
+  const float sparklePeriod =
+      lerp(55.0f, 110.0f, hash01(ledKey ^ 0xA341316CU)) /
+      lerp(0.80f, 1.25f, sparkleControl);
+  const float sparkleDuration =
+      lerp(7.0f, 16.0f, hash01(ledKey ^ 0xC8013EA4U)) /
+      lerp(0.85f, 1.15f, settings_.pattern.speed);
+  const float sparkleShiftedTime =
+      showSeconds + hash01(ledKey ^ 0xAD90777DU) * sparklePeriod;
+  const uint32_t sparkleCycle = static_cast<uint32_t>(
+      floorf(sparkleShiftedTime / sparklePeriod));
+  const float sparklePhase = sparkleShiftedTime - sparkleCycle * sparklePeriod;
+  // Square-root response keeps the useful low end broad: the persisted
+  // default of 0.10 produces a sparse but visible field, while 0 disables
+  // these blooms completely.
+  const float sparkleChance = 0.78f * sqrtf(sparkleControl);
+  const bool sparkleChosen = hash01(
+      ledKey ^ (sparkleCycle * 0x9E3779B9U)) < sparkleChance;
+
+  float sparkleEnvelope = 0.0f;
+  if (sparkleChosen && sparklePhase < sparkleDuration) {
+    const float progress = sparklePhase / sparkleDuration;
+    const float sine = sinf(PI * progress);
+    // Squaring the sine gives a long, gentle fade with exact darkness at
+    // either end. smoothstep softens its middle without creating a plateau.
+    sparkleEnvelope = smoothstep(0.0f, 1.0f, sine * sine);
+  }
+
+  const float sparklePeak =
+      lerp(0.38f, 0.85f, hash01(ledKey ^ 0x7E95761EU)) *
+      lerp(0.85f, 1.0f, sparkleControl);
+  const float sparkleHue = lerp(
+      settings_.pattern.hue,
+      settings_.pattern.hue2,
+      0.18f + 0.72f * hash01(ledKey ^ 0xB7E15162U));
+  ColorF ambient = hsv(
+      sparkleHue,
+      lerp(0.58f, 0.88f, hash01(ledKey ^ 0x243F6A88U)),
+      sparkleEnvelope * sparklePeak);
+
+  // A fixed-length per-device schedule ensures that neighbouring
+  // jellyfish do not shimmer together. A cycle-specific gate skips many
+  // candidate events, so the ripple can be relatively fast and bright while
+  // remaining rare across the forest.
+  const uint32_t jellyKey =
+      settings_.deviceId * 0x045D9F3BU + 0x27D4EB2DU;
+  const float ripplePeriod =
+      lerp(115.0f, 65.0f, settings_.pattern.density) *
+      lerp(0.82f, 1.18f, hash01(jellyKey ^ 0xB5297A4DU));
+  const float rippleDuration =
+      lerp(5.2f, 3.2f, settings_.pattern.speed);
+  const float rippleShiftedTime =
+      showSeconds + hash01(jellyKey ^ 0x68E31DA4U) * ripplePeriod;
+  const uint32_t rippleCycle = static_cast<uint32_t>(
+      floorf(rippleShiftedTime / ripplePeriod));
+  const float rippleAge = rippleShiftedTime - rippleCycle * ripplePeriod;
+  const float rippleDensity = clamp01(settings_.pattern.density);
+  // As with sparkle, zero is a real off switch. The default density accepts
+  // roughly half the candidate cycles, or one shimmer per jellyfish every
+  // two to three minutes before device-specific timing variation.
+  const float rippleChance = 0.82f * sqrtf(rippleDensity);
+  const uint32_t rippleEventKey =
+      jellyKey ^ (rippleCycle * 0x9E3779B9U);
+  const bool rippleChosen =
+      hash01(rippleEventKey ^ 0xD1B54A35U) < rippleChance;
+
+  if (rippleChosen && rippleAge < rippleDuration) {
+    const float progress = rippleAge / rippleDuration;
+    const float maximumRadius = max(0.1f, geometry_.maximumRadiusMeters());
+    const float maximumDepth = max(0.1f, geometry_.maximumDepthMeters());
+    const Vec3 normalizedLocal(
+        local.x / maximumRadius,
+        local.y / maximumDepth,
+        local.z / maximumRadius);
+    const Vec3 rippleCenter(
+        lerp(-0.62f, 0.62f, hash01(rippleEventKey ^ 0x94D049BBU)),
+        lerp(-0.90f, 0.08f, hash01(rippleEventKey ^ 0x369DEA0FU)),
+        lerp(-0.62f, 0.62f, hash01(rippleEventKey ^ 0xDB4F0B91U)));
+    const float radius = lerp(-0.08f, 2.05f, progress);
+    const float width = lerp(
+        0.075f,
+        0.145f,
+        clamp01(
+            0.225f * settings_.pattern.scale +
+            0.55f * hash01(rippleEventKey ^ 0xBB67AE85U)));
+    const float shellDistance = fabsf(
+        distance(normalizedLocal, rippleCenter) - radius);
+    const float crest = expf(
+        -(shellDistance * shellDistance) / (2.0f * width * width));
+    const float haloWidth = width * 2.8f;
+    const float halo = expf(
+        -(shellDistance * shellDistance) /
+        (2.0f * haloWidth * haloWidth));
+    const float eventEnvelope =
+        smoothstep(0.0f, 0.13f, progress) *
+        smoothstep(1.0f, 0.70f, progress);
+    const float stripShimmer = 0.82f + 0.18f * sinf(
+        strip * 2.3999f + progress * TWO_PI * 2.0f);
+    const float rippleIntensity =
+        (crest * 0.90f + halo * 0.16f) *
+        eventEnvelope * stripShimmer;
+    const float rippleHue = lerp(
+        settings_.pattern.hue,
+        settings_.pattern.hue2,
+        0.38f + 0.50f * hash01(rippleEventKey ^ 0x3C6EF372U));
+    ambient = addColor(
+        ambient,
+        hsv(rippleHue, 0.82f, rippleIntensity));
+  }
+
+  const float agitation = clamp01(max(field.agitation, simulatedAgitation));
+  const float turbulence = clamp01(max(field.turbulence, simulatedAgitation));
+
+  // For an empty field, the sparse ambient events above are the entire
+  // scene. Avoiding the old all-pixel breathing calculations also reduces
+  // work on the ESP while the installation is idle.
+  if (field.presence < 0.002f &&
+      agitation < 0.002f &&
+      chorusAmount < 0.002f) {
+    return ambient;
+  }
+
+  // -----------------------------------------------------------------------
+  // Interactive field
+  // -----------------------------------------------------------------------
+  // This keeps the previous agitation/calmness language. Occupancy supplies
+  // its own brightness floor so removing the ambient wash does not make an
+  // occupied platform response dimmer or dependent on agitation.
   const float speed = 0.18f + settings_.pattern.speed * 0.42f;
   const float scale = 0.45f + settings_.pattern.scale * 0.70f;
 
@@ -333,8 +473,6 @@ ColorF PatternEngine::forestPixel(
   const float bellBreath = 0.5f + 0.5f * sinf(
       path.pathT * 5.4f - showSeconds * speed * 0.52f + synchronizedPhase * 0.6f);
 
-  const float agitation = clamp01(max(field.agitation, simulatedAgitation));
-  const float turbulence = clamp01(max(field.turbulence, simulatedAgitation));
   const float chaotic = 0.5f + 0.5f * sinf(
       world.x * (3.2f + 5.0f * agitation) +
       world.z * (2.4f + 4.0f * agitation) +
@@ -345,10 +483,14 @@ ColorF PatternEngine::forestPixel(
   const float calmSmooth = lerp(worldWave * 0.55f + bellBreath * 0.45f, slowBreath, field.harmony * 0.70f);
   const float motion = lerp(calmSmooth, chaotic, turbulence);
 
-  const float ambient = 0.13f + 0.13f * motion;
   const float occupiedLight = field.brightness * (0.43f + 0.10f * calmSmooth);
   const float energeticLight = agitation * field.presence * (0.18f + 0.17f * chaotic);
-  float intensity = ambient + occupiedLight + energeticLight;
+  // At the centre of one platform's field, presence tops out near 0.86. This
+  // coefficient restores approximately the brightness that the former
+  // always-on ambient wash contributed there, without relighting distant or
+  // unoccupied jellyfish.
+  const float occupiedFloor = field.presence * (0.21f + 0.07f * field.calmness);
+  float intensity = occupiedFloor + occupiedLight + energeticLight;
   intensity *= 0.86f + settings_.pattern.contrast * (0.20f + 0.10f * motion);
   intensity = min(1.15f, intensity);
 
@@ -368,16 +510,7 @@ ColorF PatternEngine::forestPixel(
 
   ColorF result = lerpColor(cool, agitated, turbulence * 0.82f);
   result = lerpColor(result, calmPearl, field.harmony * 0.78f + chorusAmount * 0.15f);
-
-  const float sparkleThreshold = 1.0f - settings_.pattern.sparkle * (0.05f + field.harmony * 0.18f);
-  const uint32_t sparkleKey =
-      static_cast<uint32_t>(floorf(showSeconds * 2.0f)) * 4099U +
-      settings_.deviceId * 100003U + strip * 257U + pixel;
-  if (hash01(sparkleKey) > sparkleThreshold) {
-    const float sparklePhase = fmodf(showSeconds * 2.0f, 1.0f);
-    result = addColor(result, white((1.0f - sparklePhase) * 0.20f));
-  }
-  return result;
+  return addColor(ambient, result);
 }
 
 ColorF PatternEngine::chorusPixel(uint8_t strip, uint16_t pixel, float showSeconds) const {
