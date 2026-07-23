@@ -10,6 +10,14 @@
 
 namespace jelly {
 
+namespace {
+
+// Kept separate from the installation show bus (42120) so Soundguy can run
+// the minimal sender without touching conductor/platform traffic.
+constexpr uint16_t kMusicVolumeUdpPort = 4210;
+
+}  // namespace
+
 String NetworkManager::chipId() const {
   const uint64_t chip = ESP.getEfuseMac();
   char buffer[13];
@@ -130,9 +138,19 @@ void NetworkManager::tickWifi(uint64_t localNowMs, const DeviceSettings& setting
 
 void NetworkManager::startNetworkServices(const DeviceSettings& settings) {
   udp_.stop();
+  volumeUdp_.stop();
+
   servicesStarted_ = udp_.begin(config::kShowUdpPort) == 1;
   if (!servicesStarted_) {
     Log.println("Could not bind show UDP port.");
+    return;
+  }
+
+  if (volumeUdp_.begin(kMusicVolumeUdpPort) != 1) {
+    Log.printf("Could not bind music-volume UDP port %u.\n",
+               kMusicVolumeUdpPort);
+    udp_.stop();
+    servicesStarted_ = false;
     return;
   }
 
@@ -142,6 +160,7 @@ void NetworkManager::startNetworkServices(const DeviceSettings& settings) {
 
 void NetworkManager::stopNetworkServices() {
   udp_.stop();
+  volumeUdp_.stop();
   MDNS.end();
   servicesStarted_ = false;
 }
@@ -191,6 +210,8 @@ void NetworkManager::receive(
     parsePacket(buffer, length, localNowMs, settings, clock, interaction, renderer);
   }
 
+  receiveVolumePackets(localNowMs);
+
   if (audio_.lastPacketLocalMs != 0 && localNowMs - audio_.lastPacketLocalMs > 1000ULL) {
     audio_.level *= 0.96f;
     audio_.bass *= 0.96f;
@@ -198,6 +219,45 @@ void NetworkManager::receive(
     audio_.high *= 0.96f;
     audio_.beat = false;
   }
+}
+
+
+void NetworkManager::receiveVolumePackets(uint64_t localNowMs) {
+  // Drain several queued datagrams so a temporary render or Wi-Fi delay does
+  // not leave the lights reacting to stale volume values.
+  for (uint8_t packetIndex = 0; packetIndex < 12; ++packetIndex) {
+    const int packetSize = volumeUdp_.parsePacket();
+    if (packetSize <= 0) break;
+
+    char buffer[64];
+    const int length = volumeUdp_.read(
+        buffer,
+        min(packetSize, static_cast<int>(sizeof(buffer) - 1)));
+    if (length <= 0) continue;
+
+    buffer[length] = '\0';
+    parseVolumePacket(buffer, localNowMs);
+  }
+}
+
+void NetworkManager::parseVolumePacket(
+    const char* packet,
+    uint64_t localNowMs) {
+  float receivedVolume = 0.0f;
+  char trailing = '\0';
+
+  // The extra %c rejects malformed packets such as "volume,0.5,junk" while
+  // still accepting the sender's normal newline-free ASCII datagram.
+  const int matched = sscanf(
+      packet,
+      "volume,%f%c",
+      &receivedVolume,
+      &trailing);
+
+  if (matched != 1) return;
+
+  audio_.level = clamp01(receivedVolume);
+  audio_.lastPacketLocalMs = localNowMs;
 }
 
 void NetworkManager::parsePacket(

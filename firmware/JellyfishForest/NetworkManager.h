@@ -45,6 +45,8 @@ class NetworkManager {
   bool configureStation(const DeviceSettings& settings);
   IPAddress configuredAddress(const DeviceSettings& settings) const;
   IPAddress broadcastAddress() const;
+  void receiveVolumePackets(uint64_t localNowMs);
+  void parseVolumePacket(const char* packet, uint64_t localNowMs);
   void parsePacket(
       const char* packet,
       size_t length,
@@ -72,6 +74,7 @@ class NetworkManager {
   }
 
   WiFiUDP udp_;
+  WiFiUDP volumeUdp_;
   AudioState audio_;
   bool servicesStarted_ = false;
   bool wifiAttemptActive_ = false;

@@ -7,6 +7,14 @@
 namespace jelly {
 namespace {
 
+// Music-volume modulation is deliberately a final global multiplier. It does
+// not alter scene structure, colours, platform calmness, or power-limit logic.
+constexpr float kMusicMinimumBrightness = 0.15f;
+constexpr float kMusicMaximumBrightness = 1.00f;
+constexpr uint64_t kMusicPacketTimeoutMs = 1000ULL;
+constexpr float kMusicAttackSeconds = 0.055f;
+constexpr float kMusicReleaseSeconds = 0.220f;
+
 StripBus gStrips[config::kStripCount] = {
     {config::kMaxLedsPerStrip, config::kLedPins[0]},
     {config::kMaxLedsPerStrip, config::kLedPins[1]},
@@ -237,6 +245,7 @@ void PatternEngine::tick(
   renderScene(scene_, showNowMs / 1000.0f, localNowMs, installation, audio);
   overlayActivationWaves(showNowMs);
   applyIdentifyOverlay(localNowMs);
+  updateMusicBrightness(localNowMs, audio);
   convertAndShow(localNowMs);
   ++renderedFrames_;
 }
@@ -1122,10 +1131,50 @@ uint8_t PatternEngine::gammaByte(float value) const {
   return static_cast<uint8_t>(roundf(powf(value, 2.2f) * 255.0f));
 }
 
+
+void PatternEngine::updateMusicBrightness(
+    uint64_t localNowMs,
+    const AudioState& audio) {
+  float target = 1.0f;
+
+  const bool musicActive =
+      audio.lastPacketLocalMs != 0 &&
+      localNowMs >= audio.lastPacketLocalMs &&
+      localNowMs - audio.lastPacketLocalMs <= kMusicPacketTimeoutMs;
+
+  if (musicActive) {
+    target = lerp(
+        kMusicMinimumBrightness,
+        kMusicMaximumBrightness,
+        clamp01(audio.level));
+  }
+
+  float deltaSeconds = config::kRenderIntervalMs / 1000.0f;
+  if (lastMusicBrightnessUpdateLocalMs_ != 0 &&
+      localNowMs >= lastMusicBrightnessUpdateLocalMs_) {
+    deltaSeconds = min(
+        0.25f,
+        (localNowMs - lastMusicBrightnessUpdateLocalMs_) / 1000.0f);
+  }
+  lastMusicBrightnessUpdateLocalMs_ = localNowMs;
+
+  const float responseSeconds =
+      target > musicBrightness_
+          ? kMusicAttackSeconds
+          : kMusicReleaseSeconds;
+  const float response = responseSeconds <= 0.0f
+      ? 1.0f
+      : 1.0f - expf(-deltaSeconds / responseSeconds);
+
+  musicBrightness_ += (target - musicBrightness_) * response;
+  musicBrightness_ = clamp01(musicBrightness_);
+}
+
 void PatternEngine::convertAndShow(uint64_t localNowMs) {
   const uint16_t activeCount = geometry_.ledCountPerStrip();
   const float brightness = clamp01(settings_.pattern.brightness) *
-      clamp01(settings_.masterBrightness);
+      clamp01(settings_.masterBrightness) *
+      musicBrightness_;
   float estimatedMilliAmps = 0.0f;
   float estimatedPreviousMilliAmps = 0.0f;
 

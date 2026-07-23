@@ -14,6 +14,7 @@
 
 using namespace jelly;
 
+
 SettingsStore gSettingsStore;
 Geometry gGeometry(gSettingsStore.data());
 HX711 gHx711;

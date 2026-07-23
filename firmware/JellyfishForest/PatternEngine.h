@@ -75,6 +75,9 @@ class PatternEngine {
 
   void overlayActivationWaves(uint64_t showNowMs);
   void applyIdentifyOverlay(uint64_t localNowMs);
+  void updateMusicBrightness(
+      uint64_t localNowMs,
+      const AudioState& audio);
   void convertAndShow(uint64_t localNowMs);
   uint8_t gammaByte(float value) const;
 
@@ -97,6 +100,8 @@ class PatternEngine {
   float legacyPatternStartedShowSeconds_ = 0.0f;
   uint32_t rippleCycle_ = UINT32_MAX;
   Vec3 rippleCenter_;
+  float musicBrightness_ = 1.0f;
+  uint64_t lastMusicBrightnessUpdateLocalMs_ = 0;
 };
 
 }  // namespace jelly
